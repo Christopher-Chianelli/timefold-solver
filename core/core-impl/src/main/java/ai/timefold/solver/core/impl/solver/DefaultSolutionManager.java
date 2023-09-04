@@ -48,15 +48,14 @@ public final class DefaultSolutionManager<Solution_, Score_ extends Score<Score_
                     + ".update() with this solutionUpdatePolicy (" + solutionUpdatePolicy + ").");
         }
         return callScoreDirector(solution, solutionUpdatePolicy,
-                s -> (Score_) s.getSolutionDescriptor().getScore(s.getWorkingSolution()),
-                false);
+                s -> (Score_) s.getSolutionDescriptor().getScore(s.getWorkingSolution()), false, false);
     }
 
     @Override
     public ScoreExplanation<Solution_, Score_> explain(Solution_ solution, SolutionUpdatePolicy solutionUpdatePolicy) {
         Score_ currentScore = (Score_) getScoreDirectorFactory().getSolutionDescriptor().getScore(solution);
         ScoreExplanation<Solution_, Score_> explanation =
-                callScoreDirector(solution, solutionUpdatePolicy, DefaultScoreExplanation::new, true);
+                callScoreDirector(solution, solutionUpdatePolicy, DefaultScoreExplanation::new, true, false);
         if (!solutionUpdatePolicy.isScoreUpdateEnabled() && currentScore != null) {
             // Score update is not enabled and score is not null; this means the score is supposed to be valid.
             // Yet it is different from a freshly calculated score, suggesting previous score corruption.
@@ -75,21 +74,18 @@ public final class DefaultSolutionManager<Solution_, Score_ extends Score<Score_
     @Override
     public <In_, Out_> List<Recommendation<Out_, Score_>> recommend(Solution_ solution, In_ value,
             Function<In_, Out_> valueResultFunction) {
-        var recommender = new Recommender<Solution_, In_, Out_, Score_>(solverFactory, solution, valueResultFunction);
-        return callScoreDirector(solution, SolutionUpdatePolicy.UPDATE_ALL, recommender, false);
+        var recommender = new Recommender<Solution_, In_, Out_, Score_>(solverFactory, solution, value, valueResultFunction);
+        return callScoreDirector(solution, SolutionUpdatePolicy.UPDATE_ALL, recommender, false, true);
     }
 
     private <Result_> Result_ callScoreDirector(Solution_ solution,
             SolutionUpdatePolicy solutionUpdatePolicy, Function<InnerScoreDirector<Solution_, Score_>, Result_> function,
-            boolean enableConstraintMatch) {
-        boolean isShadowVariableUpdateEnabled = solutionUpdatePolicy.isShadowVariableUpdateEnabled();
-        Solution_ nonNullSolution = Objects.requireNonNull(solution);
-        try (InnerScoreDirector<Solution_, Score_> scoreDirector =
-                getScoreDirectorFactory().buildScoreDirector(false, enableConstraintMatch, !isShadowVariableUpdateEnabled)) {
-            scoreDirector.setWorkingSolution(nonNullSolution); // Init the ScoreDirector first, else NPEs may be thrown.
-            if (enableConstraintMatch && !scoreDirector.isConstraintMatchEnabled()) {
-                throw new IllegalStateException("When constraintMatchEnabled is disabled, this method should not be called.");
-            }
+            boolean enableConstraintMatch, boolean cloneSolution) {
+        var isShadowVariableUpdateEnabled = solutionUpdatePolicy.isShadowVariableUpdateEnabled();
+        var nonNullSolution = Objects.requireNonNull(solution);
+        try (var scoreDirector = getScoreDirectorFactory().buildScoreDirector(cloneSolution, enableConstraintMatch, !isShadowVariableUpdateEnabled)) {
+            nonNullSolution = cloneSolution ? scoreDirector.cloneSolution(nonNullSolution) : nonNullSolution;
+            scoreDirector.setWorkingSolution(nonNullSolution);
             if (isShadowVariableUpdateEnabled) {
                 scoreDirector.forceTriggerVariableListeners();
             }

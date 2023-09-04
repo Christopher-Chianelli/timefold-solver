@@ -6,6 +6,6 @@ public interface Recommendation<Result_, Score_ extends Score<Score_>> {
 
     Result_ result();
 
-    Score_ score();
+    Score_ scoreDifference();
 
 }

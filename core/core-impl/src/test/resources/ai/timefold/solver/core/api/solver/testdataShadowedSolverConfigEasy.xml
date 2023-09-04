@@ -1,0 +1,7 @@
+<solver>
+  <solutionClass>ai.timefold.solver.core.impl.testdata.domain.shadow.TestdataShadowedSolution</solutionClass>
+  <entityClass>ai.timefold.solver.core.impl.testdata.domain.shadow.TestdataShadowedEntity</entityClass>
+  <scoreDirectorFactory>
+    <easyScoreCalculatorClass>ai.timefold.solver.core.impl.testdata.domain.shadow.TestdataShadowedEasyScoreCalculator</easyScoreCalculatorClass>
+  </scoreDirectorFactory>
+</solver>
