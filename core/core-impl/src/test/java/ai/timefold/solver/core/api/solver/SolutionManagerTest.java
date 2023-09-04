@@ -16,6 +16,7 @@ import ai.timefold.solver.core.impl.testdata.domain.list.shadow_history.Testdata
 import ai.timefold.solver.core.impl.testdata.domain.list.shadow_history.TestdataListValueWithShadowHistory;
 import ai.timefold.solver.core.impl.testdata.domain.shadow.TestdataShadowedEntity;
 import ai.timefold.solver.core.impl.testdata.domain.shadow.TestdataShadowedSolution;
+import ai.timefold.solver.core.impl.util.Pair;
 
 import org.assertj.core.api.SoftAssertions;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -280,7 +281,6 @@ public class SolutionManagerTest {
                 solutionManager.recommend(solution, uninitializedEntity, TestdataShadowingChainedEntity::getChainedObject);
         assertThat(recommendationList).hasSize(6);
 
-
         // First recommendation is to be added to the "a" chain, as that results in the shortest chain.
         var firstRecommendation = recommendationList.get(0);
         assertSoftly(softly -> {
@@ -323,6 +323,78 @@ public class SolutionManagerTest {
         assertSoftly(softly -> {
             softly.assertThat(uninitializedEntity.getNextEntity()).isNull();
             softly.assertThat(solution.getScore()).isNull();
+        });
+    }
+
+    @ParameterizedTest
+    @EnumSource(SolutionManagerSource.class)
+    void recommendList(SolutionManagerSource SolutionManagerSource) {
+        var a = new TestdataListEntityWithShadowHistory("a");
+        var b0 = new TestdataListValueWithShadowHistory("b0");
+        var b = new TestdataListEntityWithShadowHistory("b", b0);
+        var c0 = new TestdataListValueWithShadowHistory("c0");
+        var c1 = new TestdataListValueWithShadowHistory("c1");
+        var c = new TestdataListEntityWithShadowHistory("c", c0, c1);
+        var solution = new TestdataListSolutionWithShadowHistory();
+        TestdataListValueWithShadowHistory uninitializedValue = new TestdataListValueWithShadowHistory("uninitialized");
+        solution.setEntityList(Arrays.asList(a, b, c));
+        solution.setValueList(Arrays.asList(b0, c0, c1, uninitializedValue));
+
+        var solutionManager = SolutionManagerSource.createSolutionManager(SOLVER_FACTORY_LIST);
+        var recommendationList =
+                solutionManager.recommend(solution, uninitializedValue, v -> Pair.of(v.getEntity(), v.getIndex()));
+        assertThat(recommendationList).hasSize(6);
+
+        // First recommendation is to be added to the "a" list variable, as that results in the shortest list.
+        var firstRecommendation = recommendationList.get(0);
+        assertSoftly(softly -> {
+            var result = (Pair<TestdataListEntityWithShadowHistory, Integer>) firstRecommendation.result();
+            softly.assertThat(result.getValue()).isEqualTo(0); // Beginning of the list.
+            // The entity is cloned...
+            var entity = result.getKey();
+            softly.assertThat(entity.getCode()).isEqualTo(a.getCode());
+            // ... but it is in a state as it would've been in the original solution.
+            softly.assertThat(entity.getValueList()).isEmpty();
+            softly.assertThat(firstRecommendation.scoreDifference()).isEqualTo(SimpleScore.of(-1));
+        });
+
+        // Second recommendation is to be added to the start of the "b" list variable.
+        var secondRecommendation = recommendationList.get(1);
+        assertSoftly(softly -> {
+            var result = (Pair<TestdataListEntityWithShadowHistory, Integer>) secondRecommendation.result();
+            softly.assertThat(result.getValue()).isEqualTo(0); // Beginning of the list.
+            var entity = result.getKey();
+            softly.assertThat(entity.getCode())
+                    .isNotEqualTo(b)
+                    .isEqualTo(b.getCode());
+            softly.assertThat(entity.getValueList()).hasSize(1);
+            softly.assertThat(secondRecommendation.scoreDifference()).isEqualTo(SimpleScore.of(-3));
+        });
+
+        // Third recommendation is to be added to the end of the "b" list variable.
+        var thirdRecommendation = recommendationList.get(2);
+        assertSoftly(softly -> {
+            var result = (Pair<TestdataListEntityWithShadowHistory, Integer>) thirdRecommendation.result();
+            softly.assertThat(result.getValue()).isEqualTo(1); // End of the list.
+            var entity = result.getKey();
+            softly.assertThat(entity.getCode())
+                    .isNotEqualTo(b)
+                    .isEqualTo(b.getCode());
+            softly.assertThat(entity.getValueList()).hasSize(1);
+            softly.assertThat(thirdRecommendation.scoreDifference()).isEqualTo(SimpleScore.of(-3));
+        });
+
+        // Fourth recommendation is to be added to the "c" list variable and so on...
+        var fourthRecommendation = recommendationList.get(3);
+        assertSoftly(softly -> {
+            var result = (Pair<TestdataListEntityWithShadowHistory, Integer>) fourthRecommendation.result();
+            softly.assertThat(result.getValue()).isEqualTo(0); // Beginning of the list.
+            var entity = result.getKey();
+            softly.assertThat(entity.getCode())
+                    .isNotEqualTo(c)
+                    .isEqualTo(c.getCode());
+            softly.assertThat(entity.getValueList()).hasSize(2);
+            softly.assertThat(fourthRecommendation.scoreDifference()).isEqualTo(SimpleScore.of(-5));
         });
     }
 

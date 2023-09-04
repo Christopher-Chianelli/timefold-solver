@@ -3,6 +3,6 @@
   <entityClass>ai.timefold.solver.core.impl.testdata.domain.list.shadow_history.TestdataListEntityWithShadowHistory</entityClass>
   <entityClass>ai.timefold.solver.core.impl.testdata.domain.list.shadow_history.TestdataListValueWithShadowHistory</entityClass>
   <scoreDirectorFactory>
-    <incrementalScoreCalculatorClass>ai.timefold.solver.core.impl.testdata.domain.list.shadow_history.TestdataListWithShadowHistoryIncrementalScoreCalculator</incrementalScoreCalculatorClass>
+    <easyScoreCalculatorClass>ai.timefold.solver.core.impl.testdata.domain.list.shadow_history.TestdataListWithShadowHistoryEasyScoreCalculator</easyScoreCalculatorClass>
   </scoreDirectorFactory>
 </solver>

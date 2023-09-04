@@ -83,7 +83,8 @@ public final class DefaultSolutionManager<Solution_, Score_ extends Score<Score_
             boolean enableConstraintMatch, boolean cloneSolution) {
         var isShadowVariableUpdateEnabled = solutionUpdatePolicy.isShadowVariableUpdateEnabled();
         var nonNullSolution = Objects.requireNonNull(solution);
-        try (var scoreDirector = getScoreDirectorFactory().buildScoreDirector(cloneSolution, enableConstraintMatch, !isShadowVariableUpdateEnabled)) {
+        try (var scoreDirector = getScoreDirectorFactory().buildScoreDirector(cloneSolution, enableConstraintMatch,
+                !isShadowVariableUpdateEnabled)) {
             nonNullSolution = cloneSolution ? scoreDirector.cloneSolution(nonNullSolution) : nonNullSolution;
             scoreDirector.setWorkingSolution(nonNullSolution);
             if (isShadowVariableUpdateEnabled) {
