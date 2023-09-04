@@ -168,7 +168,7 @@ public final class DefaultSolverFactory<Solution_> implements SolverFactory<Solu
                 solutionDescriptor);
     }
 
-    private RandomFactory buildRandomFactory(EnvironmentMode environmentMode_) {
+    public RandomFactory buildRandomFactory(EnvironmentMode environmentMode_) {
         RandomFactory randomFactory;
         if (solverConfig.getRandomFactoryClass() != null) {
             if (solverConfig.getRandomType() != null || solverConfig.getRandomSeed() != null) {
@@ -189,7 +189,7 @@ public final class DefaultSolverFactory<Solution_> implements SolverFactory<Solu
         return randomFactory;
     }
 
-    private List<Phase<Solution_>> buildPhaseList(HeuristicConfigPolicy<Solution_> configPolicy,
+    public List<Phase<Solution_>> buildPhaseList(HeuristicConfigPolicy<Solution_> configPolicy,
             BestSolutionRecaller<Solution_> bestSolutionRecaller, Termination<Solution_> termination) {
         List<PhaseConfig> phaseConfigList_ = solverConfig.getPhaseConfigList();
         if (ConfigUtils.isEmptyCollection(phaseConfigList_)) {
