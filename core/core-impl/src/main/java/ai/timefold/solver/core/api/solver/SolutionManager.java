@@ -2,7 +2,9 @@ package ai.timefold.solver.core.api.solver;
 
 import static ai.timefold.solver.core.api.solver.SolutionUpdatePolicy.UPDATE_ALL;
 
+import java.util.List;
 import java.util.UUID;
+import java.util.function.Function;
 
 import ai.timefold.solver.core.api.domain.solution.PlanningSolution;
 import ai.timefold.solver.core.api.score.Score;
@@ -99,5 +101,8 @@ public interface SolutionManager<Solution_, Score_ extends Score<Score_>> {
      * @see SolutionUpdatePolicy Description of individual policies with respect to performance trade-offs.
      */
     ScoreExplanation<Solution_, Score_> explain(Solution_ solution, SolutionUpdatePolicy solutionUpdatePolicy);
+
+    <Value_, Result_> List<Recommendation<Result_, Score_>> recommend(Solution_ solution, Value_ value,
+            Function<Value_, Result_> resultFunction);
 
 }
