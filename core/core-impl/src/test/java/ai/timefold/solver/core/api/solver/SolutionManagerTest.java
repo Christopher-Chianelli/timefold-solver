@@ -261,6 +261,71 @@ public class SolutionManagerTest {
         });
     }
 
+    @ParameterizedTest
+    @EnumSource(SolutionManagerSource.class)
+    void recommendChained(SolutionManagerSource SolutionManagerSource) {
+        var a0 = new TestdataShadowingChainedAnchor("a0");
+        var b0 = new TestdataShadowingChainedAnchor("b0");
+        var b1 = new TestdataShadowingChainedEntity("b1", b0);
+        var c0 = new TestdataShadowingChainedAnchor("c0");
+        var c1 = new TestdataShadowingChainedEntity("c1", c0);
+        var c2 = new TestdataShadowingChainedEntity("c2", c1);
+        var uninitializedEntity = new TestdataShadowingChainedEntity("uninitialized");
+        var solution = new TestdataShadowingChainedSolution("solution");
+        solution.setChainedAnchorList(Arrays.asList(a0, b0, c0));
+        solution.setChainedEntityList(Arrays.asList(b1, c1, c2, uninitializedEntity));
+
+        var solutionManager = SolutionManagerSource.createSolutionManager(SOLVER_FACTORY_CHAINED);
+        var recommendationList =
+                solutionManager.recommend(solution, uninitializedEntity, TestdataShadowingChainedEntity::getChainedObject);
+        assertThat(recommendationList).hasSize(6);
+
+
+        // First recommendation is to be added to the "a" chain, as that results in the shortest chain.
+        var firstRecommendation = recommendationList.get(0);
+        assertSoftly(softly -> {
+            var clonedAnchor = (TestdataShadowingChainedAnchor) firstRecommendation.result();
+            // The anchor is cloned...
+            softly.assertThat(clonedAnchor.getCode()).isEqualTo(a0.getCode());
+            // ... but it is in a state as it would've been in the original solution.
+            softly.assertThat(clonedAnchor.getNextEntity()).isNull();
+            softly.assertThat(firstRecommendation.scoreDifference()).isEqualTo(SimpleScore.of(-3));
+        });
+
+        // Second recommendation is to be added to the start of the "b" chain.
+        var secondRecommendation = recommendationList.get(1);
+        assertSoftly(softly -> {
+            var clonedAnchor = (TestdataShadowingChainedAnchor) secondRecommendation.result();
+            softly.assertThat(clonedAnchor.getCode()).isEqualTo(b0.getCode());
+            softly.assertThat(clonedAnchor.getNextEntity().getCode()).isEqualTo(b1.getCode());
+            softly.assertThat(secondRecommendation.scoreDifference()).isEqualTo(SimpleScore.of(-21));
+        });
+
+        // Third recommendation is to be added to the end of the "b" chain.
+        var thirdRecommendation = recommendationList.get(2);
+        assertSoftly(softly -> {
+            var clonedEntity = (TestdataShadowingChainedEntity) thirdRecommendation.result();
+            softly.assertThat(clonedEntity.getCode()).isEqualTo(b1.getCode());
+            softly.assertThat(clonedEntity.getNextEntity()).isNull();
+            softly.assertThat(thirdRecommendation.scoreDifference()).isEqualTo(SimpleScore.of(-21));
+        });
+
+        // Fourth recommendation is to be added to the start of the "c" chain and so on...
+        var fourthRecommendation = recommendationList.get(3);
+        assertSoftly(softly -> {
+            var clonedAnchor = (TestdataShadowingChainedAnchor) fourthRecommendation.result();
+            softly.assertThat(clonedAnchor.getCode()).isEqualTo(c0.getCode());
+            softly.assertThat(clonedAnchor.getNextEntity().getCode()).isEqualTo(c1.getCode());
+            softly.assertThat(fourthRecommendation.scoreDifference()).isEqualTo(SimpleScore.of(-651));
+        });
+
+        // Ensure the original solution is in its original state.
+        assertSoftly(softly -> {
+            softly.assertThat(uninitializedEntity.getNextEntity()).isNull();
+            softly.assertThat(solution.getScore()).isNull();
+        });
+    }
+
     public enum SolutionManagerSource {
 
         FROM_SOLVER_FACTORY(SolutionManager::create),
