@@ -12,7 +12,6 @@ import ai.timefold.solver.core.impl.constructionheuristic.DefaultConstructionHeu
 import ai.timefold.solver.core.impl.constructionheuristic.placer.EntityPlacer;
 import ai.timefold.solver.core.impl.constructionheuristic.scope.ConstructionHeuristicPhaseScope;
 import ai.timefold.solver.core.impl.constructionheuristic.scope.ConstructionHeuristicStepScope;
-import ai.timefold.solver.core.impl.heuristic.move.Move;
 import ai.timefold.solver.core.impl.phase.Phase;
 import ai.timefold.solver.core.impl.score.director.InnerScoreDirector;
 import ai.timefold.solver.core.impl.solver.scope.SolverScope;
@@ -59,7 +58,6 @@ final class Recommender<Solution_, In_, Out_, Score_ extends Score<Score_>>
         try {
             List<Recommendation<Out_, Score_>> recommendationList = new ArrayList<>();
             var started = false;
-            Move<Solution_> firstUndo = null;
             for (var placement : entityPlacer) {
                 if (started) {
                     throw new IllegalStateException("Impossible state: entity placer should only return one element.");
@@ -67,37 +65,16 @@ final class Recommender<Solution_, In_, Out_, Score_ extends Score<Score_>>
                     started = true;
                 }
                 for (var move : placement) {
-                    /*
-                     * Undoing the move is not necessary,
-                     * as the placer only generates moves that overwrite the variables
-                     * without taking their original values into account.
-                     * However, we want to have the original solution back in the end,
-                     * so we need to remember the first undo,
-                     * which will set the element back to its original state.
-                     */
-                    if (firstUndo == null) {
-                        firstUndo = move.doMove(scoreDirector);
-                    } else {
-                        move.doMoveOnly(scoreDirector);
-                    }
+                    var undo = move.doMove(scoreDirector);
                     var newScore = scoreDirector.calculateScore();
                     var newScoreDifference = newScore.subtract(originalScore)
                             .withInitScore(0);
                     var result = valueResultFunction.apply(clonedElement);
                     recommendationList.add(new DefaultRecommendation<>(result, newScoreDifference));
+                    undo.doMoveOnly(scoreDirector);
                 }
                 recommendationList.sort(null); // Recommendations are Comparable.
-                if (firstUndo == null) { // Made impossible by the fail-fast requiring 1 uninitialized element.
-                    throw new IllegalStateException("""
-                            Impossible state: placement (%s) returned no moves.
-                            """.formatted(placement));
-                }
-                /*
-                 * Set the solution back to the original state,
-                 * so that any result returned is as if it came from the original solution.
-                 */
-                firstUndo.doMove(scoreDirector);
-                scoreDirector.calculateScore();
+                scoreDirector.calculateScore(); // Return solution to original state.
             }
             return recommendationList;
         } catch (Exception ex) {
