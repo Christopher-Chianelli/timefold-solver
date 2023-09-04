@@ -1,6 +1,6 @@
 package ai.timefold.solver.core.impl.solver;
 
-import java.util.Collections;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Random;
@@ -10,10 +10,8 @@ import ai.timefold.solver.core.api.score.Score;
 import ai.timefold.solver.core.api.solver.Recommendation;
 import ai.timefold.solver.core.impl.constructionheuristic.DefaultConstructionHeuristicPhase;
 import ai.timefold.solver.core.impl.constructionheuristic.placer.EntityPlacer;
-import ai.timefold.solver.core.impl.constructionheuristic.placer.Placement;
 import ai.timefold.solver.core.impl.constructionheuristic.scope.ConstructionHeuristicPhaseScope;
 import ai.timefold.solver.core.impl.constructionheuristic.scope.ConstructionHeuristicStepScope;
-import ai.timefold.solver.core.impl.domain.solution.descriptor.SolutionDescriptor;
 import ai.timefold.solver.core.impl.heuristic.move.Move;
 import ai.timefold.solver.core.impl.phase.Phase;
 import ai.timefold.solver.core.impl.score.director.InnerScoreDirector;
@@ -24,18 +22,22 @@ final class Recommender<Solution_, In_, Out_, Score_ extends Score<Score_>>
 
     private final DefaultSolverFactory<Solution_> solverFactory;
     private final Solution_ originalSolution;
+    private final In_ originalElement;
     private final Function<In_, Out_> valueResultFunction;
 
-    public Recommender(DefaultSolverFactory<Solution_> solverFactory, Solution_ originalSolution,
+    public Recommender(DefaultSolverFactory<Solution_> solverFactory, Solution_ originalSolution, In_ originalElement,
             Function<In_, Out_> valueResultFunction) {
         this.solverFactory = Objects.requireNonNull(solverFactory);
         this.originalSolution = Objects.requireNonNull(originalSolution);
+        this.originalElement = originalElement;
         this.valueResultFunction = Objects.requireNonNull(valueResultFunction);
     }
 
     @Override
     public List<Recommendation<Out_, Score_>> apply(InnerScoreDirector<Solution_, Score_> scoreDirector) {
-        SolutionDescriptor<Solution_> solutionDescriptor = scoreDirector.getSolutionDescriptor();
+        var solutionDescriptor = scoreDirector.getSolutionDescriptor();
+        var originalScore = scoreDirector.calculateScore();
+        var clonedElement = scoreDirector.lookUpWorkingObject(originalElement);
         var uninitializedCount = solutionDescriptor.countUninitialized(originalSolution);
         if (uninitializedCount != 1) {
             throw new IllegalStateException("""
@@ -55,26 +57,58 @@ final class Recommender<Solution_, In_, Out_, Score_ extends Score<Score_>>
         entityPlacer.phaseStarted(phaseScope);
         entityPlacer.stepStarted(stepScope);
         try {
-            boolean started = false;
-            for (Placement<Solution_> placement : entityPlacer) {
+            List<Recommendation<Out_, Score_>> recommendationList = new ArrayList<>();
+            var started = false;
+            Move<Solution_> firstUndo = null;
+            for (var placement : entityPlacer) {
                 if (started) {
                     throw new IllegalStateException("Impossible state: entity placer should only return one element.");
                 } else {
                     started = true;
                 }
-                for (Move<Solution_> move : placement) {
-                    Move<Solution_> undo = move.doMove(scoreDirector);
-                    var score = scoreDirector.calculateScore();
-                    System.out.println(score);
-                    undo.doMoveOnly(scoreDirector);
+                for (var move : placement) {
+                    /*
+                     * Undoing the move is not necessary,
+                     * as the placer only generates moves that overwrite the variables
+                     * without taking their original values into account.
+                     * However, we want to have the original solution back in the end,
+                     * so we need to remember the first undo,
+                     * which will set the element back to its original state.
+                     */
+                    if (firstUndo == null) {
+                        firstUndo = move.doMove(scoreDirector);
+                    } else {
+                        move.doMoveOnly(scoreDirector);
+                    }
+                    var newScore = scoreDirector.calculateScore();
+                    var newScoreDifference = newScore.subtract(originalScore)
+                            .withInitScore(0);
+                    var result = valueResultFunction.apply(clonedElement);
+                    recommendationList.add(new DefaultRecommendation<>(result, newScoreDifference));
                 }
+                recommendationList.sort(null); // Recommendations are Comparable.
+                if (firstUndo == null) { // Made impossible by the fail-fast requiring 1 uninitialized element.
+                    throw new IllegalStateException("""
+                            Impossible state: placement (%s) returned no moves.
+                            """.formatted(placement));
+                }
+                /*
+                 * Set the solution back to the original state,
+                 * so that any result returned is as if it came from the original solution.
+                 */
+                firstUndo.doMove(scoreDirector);
+                scoreDirector.calculateScore();
             }
+            return recommendationList;
+        } catch (Exception ex) {
+            throw new IllegalStateException("""
+                    Recommendation API failed to evaluate the solution (%s).
+                    """.formatted(originalSolution), ex);
         } finally {
             entityPlacer.stepEnded(stepScope);
             entityPlacer.phaseEnded(phaseScope);
             entityPlacer.solvingEnded(solverScope);
         }
-        return Collections.emptyList();
     }
 
     private EntityPlacer<Solution_> buildEntityPlacer() {

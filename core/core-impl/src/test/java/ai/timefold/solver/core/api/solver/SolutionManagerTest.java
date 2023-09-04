@@ -7,12 +7,14 @@ import java.util.Arrays;
 import java.util.function.Function;
 
 import ai.timefold.solver.core.api.score.Score;
+import ai.timefold.solver.core.api.score.buildin.simple.SimpleScore;
 import ai.timefold.solver.core.impl.testdata.domain.chained.shadow.TestdataShadowingChainedAnchor;
 import ai.timefold.solver.core.impl.testdata.domain.chained.shadow.TestdataShadowingChainedEntity;
 import ai.timefold.solver.core.impl.testdata.domain.chained.shadow.TestdataShadowingChainedSolution;
 import ai.timefold.solver.core.impl.testdata.domain.list.shadow_history.TestdataListEntityWithShadowHistory;
 import ai.timefold.solver.core.impl.testdata.domain.list.shadow_history.TestdataListSolutionWithShadowHistory;
 import ai.timefold.solver.core.impl.testdata.domain.list.shadow_history.TestdataListValueWithShadowHistory;
+import ai.timefold.solver.core.impl.testdata.domain.shadow.TestdataShadowedEntity;
 import ai.timefold.solver.core.impl.testdata.domain.shadow.TestdataShadowedSolution;
 
 import org.assertj.core.api.SoftAssertions;
@@ -23,6 +25,8 @@ public class SolutionManagerTest {
 
     public static final SolverFactory<TestdataShadowedSolution> SOLVER_FACTORY =
             SolverFactory.createFromXmlResource("ai/timefold/solver/core/api/solver/testdataShadowedSolverConfig.xml");
+    public static final SolverFactory<TestdataShadowedSolution> SOLVER_FACTORY_EASY =
+            SolverFactory.createFromXmlResource("ai/timefold/solver/core/api/solver/testdataShadowedSolverConfigEasy.xml");
     public static final SolverFactory<TestdataShadowingChainedSolution> SOLVER_FACTORY_CHAINED =
             SolverFactory.createFromXmlResource("ai/timefold/solver/core/api/solver/testdataShadowingChainedSolverConfig.xml");
     public static final SolverFactory<TestdataListSolutionWithShadowHistory> SOLVER_FACTORY_LIST =
@@ -39,7 +43,7 @@ public class SolutionManagerTest {
             softly.assertThat(solution.getEntityList().get(0).getFirstShadow()).isNull();
         });
 
-        var solutionManager = SolutionManagerSource.createSolutionManager(SOLVER_FACTORY);
+        var solutionManager = SolutionManagerSource.createSolutionManager(SOLVER_FACTORY_EASY);
         assertThat(solutionManager).isNotNull();
         solutionManager.update(solution);
 
@@ -161,7 +165,7 @@ public class SolutionManagerTest {
             softly.assertThat(solution.getEntityList().get(0).getFirstShadow()).isNull();
         });
 
-        var solutionManager = SolutionManagerSource.createSolutionManager(SOLVER_FACTORY);
+        var solutionManager = SolutionManagerSource.createSolutionManager(SOLVER_FACTORY_EASY);
         assertThat(solutionManager).isNotNull();
         solutionManager.update(solution, SolutionUpdatePolicy.UPDATE_SHADOW_VARIABLES_ONLY);
 
@@ -181,7 +185,7 @@ public class SolutionManagerTest {
             softly.assertThat(solution.getEntityList().get(0).getFirstShadow()).isNull();
         });
 
-        var solutionManager = SolutionManagerSource.createSolutionManager(SOLVER_FACTORY);
+        var solutionManager = SolutionManagerSource.createSolutionManager(SOLVER_FACTORY_EASY);
         assertThat(solutionManager).isNotNull();
         solutionManager.update(solution, SolutionUpdatePolicy.UPDATE_SCORE_ONLY);
 
@@ -209,6 +213,51 @@ public class SolutionManagerTest {
             softly.assertThat(scoreExplanation.getIndictmentMap())
                     .containsOnlyKeys(solution.getEntityList().toArray());
 
+        });
+    }
+
+    @ParameterizedTest
+    @EnumSource(SolutionManagerSource.class)
+    void recommend(SolutionManagerSource SolutionManagerSource) {
+        int valueSize = 3;
+        var solution = TestdataShadowedSolution.generateSolution(valueSize, 3);
+        var uninitializedEntity = solution.getEntityList().get(2);
+        var unassignedValue = uninitializedEntity.getValue();
+        uninitializedEntity.setValue(null);
+
+        var solutionManager = SolutionManagerSource.createSolutionManager(SOLVER_FACTORY_EASY);
+        assertThat(solutionManager).isNotNull();
+        var recommendationList = solutionManager.recommend(solution, uninitializedEntity, TestdataShadowedEntity::getValue);
+
+        // Three values means there need to be three recommendations.
+        assertThat(recommendationList).hasSize(valueSize);
+        /*
+         * The calculator counts how many entities have the same value as another entity.
+         * Therefore the recommendation to assign value #2 needs to come first,
+         * as it means each entity only has each value once.
+         */
+        var firstRecommendation = recommendationList.get(0);
+        assertSoftly(softly -> {
+            softly.assertThat(firstRecommendation.result()).isEqualTo(unassignedValue);
+            softly.assertThat(firstRecommendation.scoreDifference()).isEqualTo(SimpleScore.of(-1));
+        });
+        // The other two recommendations need to come in order of the placer; so value #0, then value #1.
+        var secondRecommendation = recommendationList.get(1);
+        assertSoftly(softly -> {
+            softly.assertThat(secondRecommendation.result()).isEqualTo(solution.getValueList().get(0));
+            softly.assertThat(secondRecommendation.scoreDifference()).isEqualTo(SimpleScore.of(-3));
+        });
+        var thirdRecommendation = recommendationList.get(2);
+        assertSoftly(softly -> {
+            softly.assertThat(thirdRecommendation.result()).isEqualTo(solution.getValueList().get(1));
+            softly.assertThat(thirdRecommendation.scoreDifference()).isEqualTo(SimpleScore.of(-3));
+        });
+        // Ensure the original solution is in its original state.
+        assertSoftly(softly -> {
+            softly.assertThat(uninitializedEntity.getValue()).isNull();
+            softly.assertThat(solution.getEntityList().get(0).getValue()).isEqualTo(solution.getValueList().get(0));
+            softly.assertThat(solution.getEntityList().get(1).getValue()).isEqualTo(solution.getValueList().get(1));
+            softly.assertThat(solution.getScore()).isNull();
         });
     }
 
