@@ -57,13 +57,7 @@ final class Recommender<Solution_, In_, Out_, Score_ extends Score<Score_>>
         entityPlacer.stepStarted(stepScope);
         try {
             List<Recommendation<Out_, Score_>> recommendationList = new ArrayList<>();
-            var started = false;
             for (var placement : entityPlacer) {
-                if (started) {
-                    throw new IllegalStateException("Impossible state: entity placer should only return one element.");
-                } else {
-                    started = true;
-                }
                 for (var move : placement) {
                     var undo = move.doMove(scoreDirector);
                     var newScore = scoreDirector.calculateScore();
@@ -75,6 +69,7 @@ final class Recommender<Solution_, In_, Out_, Score_ extends Score<Score_>>
                 }
                 recommendationList.sort(null); // Recommendations are Comparable.
                 scoreDirector.calculateScore(); // Return solution to original state.
+                break; // There are no other unassigned elements to evaluate.
             }
             return recommendationList;
         } catch (Exception ex) {
