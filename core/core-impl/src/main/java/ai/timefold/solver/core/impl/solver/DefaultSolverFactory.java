@@ -6,6 +6,7 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.OptionalInt;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -108,7 +109,7 @@ public final class DefaultSolverFactory<Solution_> implements SolverFactory<Solu
                     SolverMetric.CONSTRAINT_MATCH_TOTAL_BEST_SCORE.getMeterId());
         }
 
-        Integer moveThreadCount_ = new MoveThreadCountResolver().resolveMoveThreadCount(solverConfig.getMoveThreadCount());
+        Integer moveThreadCount_ = resolveMoveThreadCount(true);
         BestSolutionRecaller<Solution_> bestSolutionRecaller =
                 BestSolutionRecallerFactory.create().buildBestSolutionRecaller(environmentMode_);
         HeuristicConfigPolicy<Solution_> configPolicy = new HeuristicConfigPolicy.Builder<>(
@@ -130,6 +131,16 @@ public final class DefaultSolverFactory<Solution_> implements SolverFactory<Solu
         return new DefaultSolver<>(environmentMode_, randomFactory, bestSolutionRecaller, basicPlumbingTermination,
                 termination, phaseList, solverScope,
                 moveThreadCount_ == null ? SolverConfig.MOVE_THREAD_COUNT_NONE : Integer.toString(moveThreadCount_));
+    }
+
+    public Integer resolveMoveThreadCount(boolean enforceMaximum) {
+        var maybeCount =
+                new MoveThreadCountResolver().resolveMoveThreadCount(solverConfig.getMoveThreadCount(), enforceMaximum);
+        if (maybeCount.isPresent()) {
+            return maybeCount.getAsInt();
+        } else {
+            return null;
+        }
     }
 
     private SolutionDescriptor<Solution_> buildSolutionDescriptor() {
@@ -235,25 +246,29 @@ public final class DefaultSolverFactory<Solution_> implements SolverFactory<Solu
     }
 
     // Required for testability as final classes cannot be mocked.
-    protected static class MoveThreadCountResolver {
+    static class MoveThreadCountResolver {
 
-        protected Integer resolveMoveThreadCount(String moveThreadCount) {
+        protected OptionalInt resolveMoveThreadCount(String moveThreadCount) {
+            return resolveMoveThreadCount(moveThreadCount, true);
+        }
+
+        protected OptionalInt resolveMoveThreadCount(String moveThreadCount, boolean enforceMaximum) {
             int availableProcessorCount = getAvailableProcessors();
-            Integer resolvedMoveThreadCount;
+            int resolvedMoveThreadCount;
             if (moveThreadCount == null || moveThreadCount.equals(SolverConfig.MOVE_THREAD_COUNT_NONE)) {
-                return null;
+                return OptionalInt.empty();
             } else if (moveThreadCount.equals(SolverConfig.MOVE_THREAD_COUNT_AUTO)) {
                 // Leave one for the Operating System and 1 for the solver thread, take the rest
                 resolvedMoveThreadCount = (availableProcessorCount - 2);
-                // A moveThreadCount beyond 4 is currently typically slower
-                // TODO remove limitation after fixing https://issues.redhat.com/browse/PLANNER-2449
-                if (resolvedMoveThreadCount > 4) {
+                if (enforceMaximum && resolvedMoveThreadCount > 4) {
+                    // A moveThreadCount beyond 4 is currently typically slower
+                    // TODO remove limitation after fixing https://issues.redhat.com/browse/PLANNER-2449
                     resolvedMoveThreadCount = 4;
                 }
                 if (resolvedMoveThreadCount <= 1) {
                     // Fall back to single threaded solving with no move threads.
                     // To deliberately enforce 1 moveThread, set the moveThreadCount explicitly to 1.
-                    return null;
+                    return OptionalInt.empty();
                 }
             } else {
                 resolvedMoveThreadCount = ConfigUtils.resolvePoolSize("moveThreadCount", moveThreadCount,
@@ -270,7 +285,7 @@ public final class DefaultSolverFactory<Solution_> implements SolverFactory<Solu
                         resolvedMoveThreadCount, availableProcessorCount);
                 // Still allow it, to reproduce issues of a high-end server machine on a low-end developer machine
             }
-            return resolvedMoveThreadCount;
+            return OptionalInt.of(resolvedMoveThreadCount);
         }
 
         protected int getAvailableProcessors() {

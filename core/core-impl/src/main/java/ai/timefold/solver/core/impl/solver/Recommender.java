@@ -4,25 +4,19 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Random;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 
 import ai.timefold.solver.core.api.score.Score;
 import ai.timefold.solver.core.api.solver.Recommendation;
+import ai.timefold.solver.core.enterprise.MultithreadedRecommendationEnterpriseService;
 import ai.timefold.solver.core.impl.constructionheuristic.DefaultConstructionHeuristicPhase;
 import ai.timefold.solver.core.impl.constructionheuristic.placer.EntityPlacer;
 import ai.timefold.solver.core.impl.constructionheuristic.scope.ConstructionHeuristicPhaseScope;
 import ai.timefold.solver.core.impl.constructionheuristic.scope.ConstructionHeuristicStepScope;
-import ai.timefold.solver.core.impl.heuristic.move.Move;
 import ai.timefold.solver.core.impl.phase.Phase;
 import ai.timefold.solver.core.impl.score.director.InnerScoreDirector;
 import ai.timefold.solver.core.impl.solver.scope.SolverScope;
-import ai.timefold.solver.core.impl.solver.thread.ChildThreadType;
 
 final class Recommender<Solution_, In_, Out_, Score_ extends Score<Score_>>
         implements Function<InnerScoreDirector<Solution_, Score_>, List<Recommendation<Out_, Score_>>> {
@@ -63,12 +57,11 @@ final class Recommender<Solution_, In_, Out_, Score_ extends Score<Score_>>
         entityPlacer.solvingStarted(solverScope);
         entityPlacer.phaseStarted(phaseScope);
         entityPlacer.stepStarted(stepScope);
-        try (var execution =
-                new MultiThreadedRecommenderExecution<>(scoreDirector, valueResultFunction, originalScore, clonedElement)) {
+        try (var processor = getProcessor(scoreDirector, originalScore, clonedElement)) {
             for (var placement : entityPlacer) {
                 List<CompletableFuture<Recommendation<Out_, Score_>>> futureList = new ArrayList<>();
                 for (var move : placement) {
-                    futureList.add(execution.execute(move));
+                    futureList.add(processor.execute(move));
                 }
                 List<Recommendation<Out_, Score_>> recommendationList = new ArrayList<>(futureList.size());
                 for (var future : futureList) {
@@ -93,6 +86,19 @@ final class Recommender<Solution_, In_, Out_, Score_ extends Score<Score_>>
         }
     }
 
+    private RecommendationProcessor<Solution_, Out_, Score_>
+            getProcessor(InnerScoreDirector<Solution_, Score_> parentScoreDirector, Score_ originalScore, In_ clonedElement) {
+        // Recommendation API scales linearly, no need for artificial upper move thread count limit.
+        var moveThreadCount = solverFactory.resolveMoveThreadCount(false);
+        if (moveThreadCount == null) {
+            return new SingleThreadedRecommendationProcessor<>(parentScoreDirector, valueResultFunction, originalScore,
+                    clonedElement);
+        } else {
+            return MultithreadedRecommendationEnterpriseService.load(moveThreadCount)
+                    .buildProcessor(moveThreadCount, parentScoreDirector, valueResultFunction, originalScore, clonedElement);
+        }
+    }
+
     private EntityPlacer<Solution_> buildEntityPlacer() {
         DefaultSolver<Solution_> solver = (DefaultSolver<Solution_>) solverFactory.buildSolver();
         List<Phase<Solution_>> phaseList = solver.getPhaseList();
@@ -105,113 +111,6 @@ final class Recommender<Solution_, In_, Out_, Score_ extends Score<Score_>>
                     """
                     .formatted(phase));
         }
-    }
-
-    private static final class SingleThreadedRecommenderExecution<Solution_, In_, Out_, Score_ extends Score<Score_>>
-            implements RecommenderExecution<Solution_, Out_, Score_> {
-
-        private final InnerScoreDirector<Solution_, Score_> scoreDirector;
-        private final Function<In_, Out_> valueResultFunction;
-        private final Score_ originalScore;
-        private final In_ clonedElement;
-
-        public SingleThreadedRecommenderExecution(InnerScoreDirector<Solution_, Score_> scoreDirector,
-                Function<In_, Out_> valueResultFunction, Score_ originalScore, In_ clonedElement) {
-            this.scoreDirector = scoreDirector;
-            this.valueResultFunction = valueResultFunction;
-            this.originalScore = originalScore;
-            this.clonedElement = clonedElement;
-        }
-
-        @Override
-        public CompletableFuture<Recommendation<Out_, Score_>> execute(Move<Solution_> move) {
-            var undo = move.doMove(scoreDirector);
-            var newScore = scoreDirector.calculateScore();
-            var newScoreDifference = newScore.subtract(originalScore)
-                    .withInitScore(0);
-            var result = valueResultFunction.apply(clonedElement);
-            var recommendation = new DefaultRecommendation<>(result, newScoreDifference);
-            undo.doMoveOnly(scoreDirector);
-            return CompletableFuture.completedFuture(recommendation);
-        }
-
-        @Override
-        public void close() {
-            // No need to do anything.
-        }
-    }
-
-    private static final class MultiThreadedRecommenderExecution<Solution_, In_, Out_, Score_ extends Score<Score_>>
-            implements RecommenderExecution<Solution_, Out_, Score_> {
-
-        private final int moveThreadCount = 8;
-        private final AtomicLong createdScoreDirectorCount = new AtomicLong(0);
-        private final InnerScoreDirector<Solution_, Score_> parentScoreDirector;
-        private final BlockingQueue<InnerScoreDirector<Solution_, Score_>> availableScoreDirectorQueue;
-        private final Function<In_, Out_> valueResultFunction;
-        private final Score_ originalScore;
-        private final In_ originalElement;
-        private final ExecutorService executorService;
-
-        public MultiThreadedRecommenderExecution(InnerScoreDirector<Solution_, Score_> scoreDirector,
-                Function<In_, Out_> valueResultFunction, Score_ originalScore, In_ originalElement) {
-            this.executorService = Executors.newFixedThreadPool(moveThreadCount);
-            this.parentScoreDirector = scoreDirector;
-            this.availableScoreDirectorQueue = new LinkedBlockingQueue<>(); // Don't make it bounded.
-            this.valueResultFunction = valueResultFunction;
-            this.originalScore = originalScore;
-            this.originalElement = originalElement;
-        }
-
-        @Override
-        public CompletableFuture<Recommendation<Out_, Score_>> execute(Move<Solution_> move) {
-            return CompletableFuture.supplyAsync(() -> {
-                try {
-                    var scoreDirector = getOrCreateScoreDirector();
-                    Out_ result;
-                    Score_ newScore;
-                    try {
-                        var undo = move.rebase(scoreDirector)
-                                .doMove(scoreDirector);
-                        newScore = scoreDirector.calculateScore();
-                        var clonedElement = scoreDirector.lookUpWorkingObject(originalElement);
-                        result = valueResultFunction.apply(clonedElement);
-                        undo.doMoveOnly(scoreDirector);
-                    } finally {
-                        /*
-                         * Once we've taken the score director, we must return it.
-                         * This call will always pass because the queue is not bounded.
-                         */
-                        this.availableScoreDirectorQueue.offer(scoreDirector);
-                    }
-                    var newScoreDifference = newScore.subtract(originalScore)
-                            .withInitScore(0);
-                    return new DefaultRecommendation<>(result, newScoreDifference);
-                } catch (Exception ex) {
-                    throw new IllegalStateException("Recommendation execution threw an exception.", ex);
-                }
-            }, executorService);
-        }
-
-        private InnerScoreDirector<Solution_, Score_> getOrCreateScoreDirector() throws InterruptedException {
-            var createdScoreDirectorCount = this.createdScoreDirectorCount.getAndAccumulate(1,
-                    (a, b) -> (a + b) >= moveThreadCount ? moveThreadCount : (a + b));
-            return createdScoreDirectorCount < moveThreadCount
-                    ? parentScoreDirector.createChildThreadScoreDirector(ChildThreadType.MOVE_THREAD)
-                    : availableScoreDirectorQueue.take();
-        }
-
-        @Override
-        public void close() {
-            executorService.shutdownNow();
-            availableScoreDirectorQueue.forEach(InnerScoreDirector::close);
-        }
-    }
-
-    private interface RecommenderExecution<Solution_, Out_, Score_ extends Score<Score_>> extends AutoCloseable {
-
-        CompletableFuture<Recommendation<Out_, Score_>> execute(Move<Solution_> move);
-
     }
 
 }
