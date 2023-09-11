@@ -9,13 +9,13 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 
 import ai.timefold.solver.core.api.score.Score;
-import ai.timefold.solver.core.api.solver.Recommendation;
+import ai.timefold.solver.core.api.solver.RecommendedFit;
 import ai.timefold.solver.core.impl.heuristic.move.Move;
 import ai.timefold.solver.core.impl.score.director.InnerScoreDirector;
 import ai.timefold.solver.core.impl.solver.thread.ChildThreadType;
 
-final class MultiThreadedRecommendationProcessor<Solution_, In_, Out_, Score_ extends Score<Score_>>
-        implements RecommendationProcessor<Solution_, Out_, Score_> {
+final class MultiThreadedFitProcessor<Solution_, In_, Out_, Score_ extends Score<Score_>>
+        implements FitProcessor<Solution_, Out_, Score_> {
 
     private final int moveThreadCount;
     private final AtomicLong createdScoreDirectorCount = new AtomicLong(0);
@@ -26,7 +26,7 @@ final class MultiThreadedRecommendationProcessor<Solution_, In_, Out_, Score_ ex
     private final In_ originalElement;
     private final ExecutorService executorService;
 
-    public MultiThreadedRecommendationProcessor(int moveThreadCount, InnerScoreDirector<Solution_, Score_> scoreDirector,
+    public MultiThreadedFitProcessor(int moveThreadCount, InnerScoreDirector<Solution_, Score_> scoreDirector,
             Function<In_, Out_> valueResultFunction, Score_ originalScore, In_ originalElement) {
         this.moveThreadCount = moveThreadCount;
         this.executorService = Executors.newFixedThreadPool(moveThreadCount);
@@ -38,7 +38,7 @@ final class MultiThreadedRecommendationProcessor<Solution_, In_, Out_, Score_ ex
     }
 
     @Override
-    public CompletableFuture<Recommendation<Out_, Score_>> execute(Move<Solution_> move) {
+    public CompletableFuture<RecommendedFit<Out_, Score_>> execute(Move<Solution_> move) {
         return CompletableFuture.supplyAsync(() -> {
             try {
                 var scoreDirector = getOrCreateScoreDirector();
@@ -60,7 +60,7 @@ final class MultiThreadedRecommendationProcessor<Solution_, In_, Out_, Score_ ex
                 }
                 var newScoreDifference = newScore.subtract(originalScore)
                         .withInitScore(0);
-                return new DefaultRecommendation<>(result, newScoreDifference);
+                return new DefaultRecommendedFit<>(result, newScoreDifference);
             } catch (Exception ex) {
                 throw new IllegalStateException("Recommendation execution threw an exception.", ex);
             }

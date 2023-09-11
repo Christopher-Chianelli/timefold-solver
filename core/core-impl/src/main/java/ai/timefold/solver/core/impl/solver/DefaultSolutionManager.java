@@ -7,7 +7,7 @@ import java.util.function.Function;
 import ai.timefold.solver.core.api.domain.solution.PlanningSolution;
 import ai.timefold.solver.core.api.score.Score;
 import ai.timefold.solver.core.api.score.ScoreExplanation;
-import ai.timefold.solver.core.api.solver.Recommendation;
+import ai.timefold.solver.core.api.solver.RecommendedFit;
 import ai.timefold.solver.core.api.solver.SolutionManager;
 import ai.timefold.solver.core.api.solver.SolutionUpdatePolicy;
 import ai.timefold.solver.core.api.solver.SolverFactory;
@@ -72,10 +72,10 @@ public final class DefaultSolutionManager<Solution_, Score_ extends Score<Score_
     }
 
     @Override
-    public <In_, Out_> List<Recommendation<Out_, Score_>> recommend(Solution_ solution, In_ value,
-            Function<In_, Out_> valueResultFunction) {
-        var recommender = new Recommender<Solution_, In_, Out_, Score_>(solverFactory, solution, value, valueResultFunction);
-        return callScoreDirector(solution, SolutionUpdatePolicy.UPDATE_ALL, recommender, false, true);
+    public <In_, Out_> List<RecommendedFit<Out_, Score_>> recommendFit(Solution_ solution, In_ fittedElement,
+            Function<In_, Out_> propositionFunction) {
+        var fitter = new Fitter<Solution_, In_, Out_, Score_>(solverFactory, solution, fittedElement, propositionFunction);
+        return callScoreDirector(solution, SolutionUpdatePolicy.UPDATE_ALL, fitter, false, true);
     }
 
     private <Result_> Result_ callScoreDirector(Solution_ solution,
