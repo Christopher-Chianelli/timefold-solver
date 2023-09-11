@@ -286,6 +286,7 @@ public class SolutionManagerTest {
         assertSoftly(softly -> {
             var clonedAnchor = (TestdataShadowingChainedAnchor) firstRecommendation.result();
             // The anchor is cloned...
+            softly.assertThat(clonedAnchor).isNotEqualTo(a0);
             softly.assertThat(clonedAnchor.getCode()).isEqualTo(a0.getCode());
             // ... but it is in a state as it would've been in the original solution.
             softly.assertThat(clonedAnchor.getNextEntity()).isNull();
@@ -296,6 +297,7 @@ public class SolutionManagerTest {
         var secondRecommendation = recommendationList.get(1);
         assertSoftly(softly -> {
             var clonedAnchor = (TestdataShadowingChainedAnchor) secondRecommendation.result();
+            softly.assertThat(clonedAnchor).isNotEqualTo(b0);
             softly.assertThat(clonedAnchor.getCode()).isEqualTo(b0.getCode());
             softly.assertThat(clonedAnchor.getNextEntity().getCode()).isEqualTo(b1.getCode());
             softly.assertThat(secondRecommendation.scoreDifference()).isEqualTo(SimpleScore.of(-21));
@@ -305,6 +307,7 @@ public class SolutionManagerTest {
         var thirdRecommendation = recommendationList.get(2);
         assertSoftly(softly -> {
             var clonedEntity = (TestdataShadowingChainedEntity) thirdRecommendation.result();
+            softly.assertThat(clonedEntity).isNotEqualTo(b1);
             softly.assertThat(clonedEntity.getCode()).isEqualTo(b1.getCode());
             softly.assertThat(clonedEntity.getNextEntity()).isNull();
             softly.assertThat(thirdRecommendation.scoreDifference()).isEqualTo(SimpleScore.of(-21));
@@ -314,6 +317,7 @@ public class SolutionManagerTest {
         var fourthRecommendation = recommendationList.get(3);
         assertSoftly(softly -> {
             var clonedAnchor = (TestdataShadowingChainedAnchor) fourthRecommendation.result();
+            softly.assertThat(clonedAnchor).isNotEqualTo(c0);
             softly.assertThat(clonedAnchor.getCode()).isEqualTo(c0.getCode());
             softly.assertThat(clonedAnchor.getNextEntity().getCode()).isEqualTo(c1.getCode());
             softly.assertThat(fourthRecommendation.scoreDifference()).isEqualTo(SimpleScore.of(-651));
@@ -352,6 +356,7 @@ public class SolutionManagerTest {
             softly.assertThat(result.getValue()).isEqualTo(0); // Beginning of the list.
             // The entity is cloned...
             var entity = result.getKey();
+            softly.assertThat(entity).isNotEqualTo(a);
             softly.assertThat(entity.getCode()).isEqualTo(a.getCode());
             // ... but it is in a state as it would've been in the original solution.
             softly.assertThat(entity.getValueList()).isEmpty();
@@ -364,9 +369,8 @@ public class SolutionManagerTest {
             var result = (Pair<TestdataListEntityWithShadowHistory, Integer>) secondRecommendation.result();
             softly.assertThat(result.getValue()).isEqualTo(0); // Beginning of the list.
             var entity = result.getKey();
-            softly.assertThat(entity.getCode())
-                    .isNotEqualTo(b)
-                    .isEqualTo(b.getCode());
+            softly.assertThat(entity).isNotEqualTo(b);
+            softly.assertThat(entity.getCode()).isEqualTo(b.getCode());
             softly.assertThat(entity.getValueList()).hasSize(1);
             softly.assertThat(secondRecommendation.scoreDifference()).isEqualTo(SimpleScore.of(-3));
         });
@@ -377,9 +381,8 @@ public class SolutionManagerTest {
             var result = (Pair<TestdataListEntityWithShadowHistory, Integer>) thirdRecommendation.result();
             softly.assertThat(result.getValue()).isEqualTo(1); // End of the list.
             var entity = result.getKey();
-            softly.assertThat(entity.getCode())
-                    .isNotEqualTo(b)
-                    .isEqualTo(b.getCode());
+            softly.assertThat(entity).isNotEqualTo(b);
+            softly.assertThat(entity.getCode()).isEqualTo(b.getCode());
             softly.assertThat(entity.getValueList()).hasSize(1);
             softly.assertThat(thirdRecommendation.scoreDifference()).isEqualTo(SimpleScore.of(-3));
         });
@@ -390,9 +393,8 @@ public class SolutionManagerTest {
             var result = (Pair<TestdataListEntityWithShadowHistory, Integer>) fourthRecommendation.result();
             softly.assertThat(result.getValue()).isEqualTo(0); // Beginning of the list.
             var entity = result.getKey();
-            softly.assertThat(entity.getCode())
-                    .isNotEqualTo(c)
-                    .isEqualTo(c.getCode());
+            softly.assertThat(entity.getCode()).isNotEqualTo(c);
+            softly.assertThat(entity.getCode()).isEqualTo(c.getCode());
             softly.assertThat(entity.getValueList()).hasSize(2);
             softly.assertThat(fourthRecommendation.scoreDifference()).isEqualTo(SimpleScore.of(-5));
         });
