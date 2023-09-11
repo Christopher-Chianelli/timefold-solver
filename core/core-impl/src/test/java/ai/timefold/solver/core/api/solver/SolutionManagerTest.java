@@ -219,7 +219,7 @@ public class SolutionManagerTest {
 
     @ParameterizedTest
     @EnumSource(SolutionManagerSource.class)
-    void recommend(SolutionManagerSource SolutionManagerSource) {
+    void recommendFit(SolutionManagerSource SolutionManagerSource) {
         int valueSize = 3;
         var solution = TestdataShadowedSolution.generateSolution(valueSize, 3);
         var uninitializedEntity = solution.getEntityList().get(2);
@@ -228,7 +228,7 @@ public class SolutionManagerTest {
 
         var solutionManager = SolutionManagerSource.createSolutionManager(SOLVER_FACTORY_EASY);
         assertThat(solutionManager).isNotNull();
-        var recommendationList = solutionManager.recommend(solution, uninitializedEntity, TestdataShadowedEntity::getValue);
+        var recommendationList = solutionManager.recommendFit(solution, uninitializedEntity, TestdataShadowedEntity::getValue);
 
         // Three values means there need to be three recommendations.
         assertThat(recommendationList).hasSize(valueSize);
@@ -264,7 +264,7 @@ public class SolutionManagerTest {
 
     @ParameterizedTest
     @EnumSource(SolutionManagerSource.class)
-    void recommendChained(SolutionManagerSource SolutionManagerSource) {
+    void recommendFitChained(SolutionManagerSource SolutionManagerSource) {
         var a0 = new TestdataShadowingChainedAnchor("a0");
         var b0 = new TestdataShadowingChainedAnchor("b0");
         var b1 = new TestdataShadowingChainedEntity("b1", b0);
@@ -278,7 +278,7 @@ public class SolutionManagerTest {
 
         var solutionManager = SolutionManagerSource.createSolutionManager(SOLVER_FACTORY_CHAINED);
         var recommendationList =
-                solutionManager.recommend(solution, uninitializedEntity, TestdataShadowingChainedEntity::getChainedObject);
+                solutionManager.recommendFit(solution, uninitializedEntity, TestdataShadowingChainedEntity::getChainedObject);
         assertThat(recommendationList).hasSize(6);
 
         // First recommendation is to be added to the "a" chain, as that results in the shortest chain.
@@ -332,7 +332,7 @@ public class SolutionManagerTest {
 
     @ParameterizedTest
     @EnumSource(SolutionManagerSource.class)
-    void recommendList(SolutionManagerSource SolutionManagerSource) {
+    void recommendFitList(SolutionManagerSource SolutionManagerSource) {
         var a = new TestdataListEntityWithShadowHistory("a");
         var b0 = new TestdataListValueWithShadowHistory("b0");
         var b = new TestdataListEntityWithShadowHistory("b", b0);
@@ -346,7 +346,7 @@ public class SolutionManagerTest {
 
         var solutionManager = SolutionManagerSource.createSolutionManager(SOLVER_FACTORY_LIST);
         var recommendationList =
-                solutionManager.recommend(solution, uninitializedValue, v -> Pair.of(v.getEntity(), v.getIndex()));
+                solutionManager.recommendFit(solution, uninitializedValue, v -> Pair.of(v.getEntity(), v.getIndex()));
         assertThat(recommendationList).hasSize(6);
 
         // First recommendation is to be added to the "a" list variable, as that results in the shortest list.
