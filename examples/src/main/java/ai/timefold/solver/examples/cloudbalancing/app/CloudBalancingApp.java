@@ -32,14 +32,14 @@ public class CloudBalancingApp extends CommonApp<CloudBalance> {
         CloudProcess process = solution.getProcessList().get(0);
         process.setComputer(null);
 
-        for (int i = 0; i < 16; i = Math.max(1, i * 2)) {
-            run(solution, process, i);
+        for (int moveThreadCount = 0; moveThreadCount < 16; moveThreadCount = Math.max(1, moveThreadCount * 2)) {
+            run(solution, process, moveThreadCount);
         }
     }
 
-    private static void run(CloudBalance solution, CloudProcess process, int i) {
+    private static void run(CloudBalance solution, CloudProcess process, int moveThreadCount) {
         SolverConfig solverConfig = SolverConfig.createFromXmlResource(SOLVER_CONFIG);
-        solverConfig.setMoveThreadCount(i == 0 ? "NONE" : Integer.toString(i));
+        solverConfig.setMoveThreadCount(moveThreadCount == 0 ? "NONE" : Integer.toString(moveThreadCount));
         SolverFactory<CloudBalance> factory = SolverFactory.create(solverConfig);
         SolutionManager<CloudBalance, HardSoftScore> solutionManager = SolutionManager.create(factory);
         long totalTime = 0;
@@ -50,8 +50,8 @@ public class CloudBalancingApp extends CommonApp<CloudBalance> {
             long endTime = System.nanoTime() - startTime;
             totalTime += endTime;
         }
-        System.out.printf("Move thread count: %2d - Average time: %d millis%n",
-                i, Duration.ofNanos(totalTime / 1_000).toMillis());
+        System.out.printf("Move thread count: %2d - Average time: %2d millis%n",
+                moveThreadCount, Duration.ofNanos(totalTime / 1_000).toMillis());
     }
 
     public CloudBalancingApp() {

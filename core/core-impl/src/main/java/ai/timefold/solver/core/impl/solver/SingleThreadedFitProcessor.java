@@ -1,5 +1,7 @@
 package ai.timefold.solver.core.impl.solver;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 
@@ -15,6 +17,7 @@ final class SingleThreadedFitProcessor<Solution_, In_, Out_, Score_ extends Scor
     private final Function<In_, Out_> valueResultFunction;
     private final Score_ originalScore;
     private final In_ clonedElement;
+    private final List<RecommendedFit<Out_, Score_>> recommendationList = new ArrayList<>();
 
     public SingleThreadedFitProcessor(InnerScoreDirector<Solution_, Score_> scoreDirector,
             Function<In_, Out_> valueResultFunction, Score_ originalScore, In_ clonedElement) {
@@ -25,15 +28,22 @@ final class SingleThreadedFitProcessor<Solution_, In_, Out_, Score_ extends Scor
     }
 
     @Override
-    public CompletableFuture<RecommendedFit<Out_, Score_>> execute(Move<Solution_> move) {
+    public CompletableFuture<Void> execute(Move<Solution_> move) {
         var undo = move.doMove(scoreDirector);
         var newScore = scoreDirector.calculateScore();
         var newScoreDifference = newScore.subtract(originalScore)
                 .withInitScore(0);
         var result = valueResultFunction.apply(clonedElement);
         var recommendation = new DefaultRecommendedFit<>(result, newScoreDifference);
+        recommendationList.add(recommendation);
         undo.doMoveOnly(scoreDirector);
-        return CompletableFuture.completedFuture(recommendation);
+        return CompletableFuture.completedFuture(null);
+    }
+
+    @Override
+    public List<RecommendedFit<Out_, Score_>> getRecommendations() {
+        recommendationList.sort(null);
+        return recommendationList;
     }
 
     @Override
