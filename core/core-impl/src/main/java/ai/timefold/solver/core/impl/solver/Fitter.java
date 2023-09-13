@@ -1,10 +1,10 @@
 package ai.timefold.solver.core.impl.solver;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Random;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Function;
 
 import ai.timefold.solver.core.api.score.Score;
@@ -59,17 +59,15 @@ final class Fitter<Solution_, In_, Out_, Score_ extends Score<Score_>>
         entityPlacer.stepStarted(stepScope);
         try (var processor = getProcessor(scoreDirector, originalScore, clonedElement)) {
             for (var placement : entityPlacer) {
-                List<CompletableFuture<RecommendedFit<Out_, Score_>>> futureList = new ArrayList<>();
+                List<RecommendedFit<Out_, Score_>> recommendedFitList = new CopyOnWriteArrayList<>();
+                CompletableFuture<Void> allTasksFinished = CompletableFuture.completedFuture(null);
                 for (var move : placement) {
-                    futureList.add(processor.execute(move));
+                    var partialTaskFinished = processor.execute(move).thenAccept(recommendedFitList::add);
+                    allTasksFinished = CompletableFuture.allOf(allTasksFinished, partialTaskFinished);
                 }
-                List<RecommendedFit<Out_, Score_>> recommendedFitList = new ArrayList<>(futureList.size());
-                for (var future : futureList) {
-                    var recommendation = future.get();
-                    recommendedFitList.add(recommendation);
-                }
-                recommendedFitList.sort(null); // Recommendations are Comparable.
+                allTasksFinished.join(); // Wait for all tasks to finish.
                 scoreDirector.calculateScore(); // Return solution to original state.
+                recommendedFitList.sort(null);
                 return recommendedFitList; // There are no other unassigned elements to evaluate.
             }
             throw new IllegalStateException("""
