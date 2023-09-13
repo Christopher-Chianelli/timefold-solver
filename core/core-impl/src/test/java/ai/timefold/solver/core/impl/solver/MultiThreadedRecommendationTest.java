@@ -25,7 +25,7 @@ public class MultiThreadedRecommendationTest {
     @ParameterizedTest
     @ResourceLock("cpu")
     public void testMultithreadedRecommendation(int threadCount) {
-        int valueSize = 100_000;
+        int valueSize = 5_000_000;
         var solution = TestdataShadowedSolution.generateSolution(valueSize, 3);
         var uninitializedEntity = solution.getEntityList().get(2);
         var unassignedValue = uninitializedEntity.getValue();

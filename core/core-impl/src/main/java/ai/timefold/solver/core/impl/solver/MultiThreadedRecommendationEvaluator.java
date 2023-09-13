@@ -5,6 +5,7 @@ import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 import ai.timefold.solver.core.api.score.Score;
 import ai.timefold.solver.core.api.solver.RecommendedFit;
@@ -13,7 +14,8 @@ import ai.timefold.solver.core.impl.score.director.InnerScoreDirector;
 
 public final class MultiThreadedRecommendationEvaluator<Solution_, In_, Out_, Score_ extends Score<Score_>>
         implements Runnable {
-    private final ThreadState<Solution_, In_, Out_, Score_> state;
+    private final Supplier<ThreadState<Solution_, In_, Out_, Score_>> stateSupplier;
+    private ThreadState<Solution_, In_, Out_, Score_> state;
     private final Function<In_, Out_> valueResultFunction;
     private final Score_ originalScore;
     private final ConcurrentLinkedDeque<MoveRequest<Solution_>> moveRequests = new ConcurrentLinkedDeque<>();
@@ -21,11 +23,11 @@ public final class MultiThreadedRecommendationEvaluator<Solution_, In_, Out_, Sc
     private final Semaphore newWorkAvailable = new Semaphore(0);
 
     public MultiThreadedRecommendationEvaluator(
-            ThreadState<Solution_, In_, Out_, Score_> state,
+            Supplier<ThreadState<Solution_, In_, Out_, Score_>> state,
             Function<In_, Out_> valueResultFunction,
             Score_ originalScore,
             AtomicBoolean isNotDone) {
-        this.state = state;
+        this.stateSupplier = state;
         this.valueResultFunction = valueResultFunction;
         this.originalScore = originalScore;
         this.isNotDone = isNotDone;
@@ -33,6 +35,7 @@ public final class MultiThreadedRecommendationEvaluator<Solution_, In_, Out_, Sc
 
     @Override
     public void run() {
+        state = stateSupplier.get();
         while (isNotDone.get()) {
             if (newWorkAvailable.tryAcquire()) {
                 var move = moveRequests.poll();

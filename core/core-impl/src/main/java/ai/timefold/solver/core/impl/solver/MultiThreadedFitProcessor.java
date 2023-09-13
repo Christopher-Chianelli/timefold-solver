@@ -33,12 +33,14 @@ final class MultiThreadedFitProcessor<Solution_, In_, Out_, Score_ extends Score
         this.moveEvaluator = new MultiThreadedRecommendationEvaluator[moveThreadCount];
 
         for (int i = 0; i < moveThreadCount; i++) {
-            var sd = scoreDirector.createChildThreadScoreDirector(ChildThreadType.MOVE_THREAD);
-            var e = sd.lookUpWorkingObject(originalElement);
-            var buffer = new ArrayList<RecommendedFit<Out_, Score_>>();
-            recommendationBuffer.put(sd, buffer);
             moveEvaluator[i] = new MultiThreadedRecommendationEvaluator<>(
-                    new MultiThreadedRecommendationEvaluator.ThreadState<>(sd, e, buffer),
+                    () -> {
+                        var sd = scoreDirector.createChildThreadScoreDirector(ChildThreadType.MOVE_THREAD);
+                        var e = sd.lookUpWorkingObject(originalElement);
+                        var buffer = new ArrayList<RecommendedFit<Out_, Score_>>();
+                        recommendationBuffer.put(sd, buffer);
+                        return new MultiThreadedRecommendationEvaluator.ThreadState<>(sd, e, buffer);
+                    },
                     valueResultFunction,
                     originalScore,
                     isNotDone);

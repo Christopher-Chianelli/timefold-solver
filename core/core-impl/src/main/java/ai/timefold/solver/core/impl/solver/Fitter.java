@@ -58,7 +58,6 @@ final class Fitter<Solution_, In_, Out_, Score_ extends Score<Score_>>
         entityPlacer.stepStarted(stepScope);
         try (var processor = getProcessor(scoreDirector, originalScore, clonedElement)) {
             for (var placement : entityPlacer) {
-                long start = System.nanoTime();
                 var finishedMoveSemaphore = new Semaphore(0);
                 var moveCount = 0;
                 for (var move : placement) {
@@ -66,15 +65,10 @@ final class Fitter<Solution_, In_, Out_, Score_ extends Score<Score_>>
                     moveCount++;
                 }
                 finishedMoveSemaphore.acquire(moveCount); // Wait for all tasks to finish.
-                long end = System.nanoTime();
-                System.out.println("Eval moves take " + (end - start));
 
                 scoreDirector.calculateScore(); // Return solution to original state.
 
-                start = System.nanoTime();
                 var out = processor.getRecommendations(); // There are no other unassigned elements to evaluate.
-                end = System.nanoTime();
-                System.out.println("Sort moves take " + (end - start));
                 return out;
             }
             throw new IllegalStateException("""
