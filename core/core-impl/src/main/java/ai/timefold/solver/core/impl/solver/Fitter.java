@@ -1,5 +1,6 @@
 package ai.timefold.solver.core.impl.solver;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Random;
@@ -58,10 +59,11 @@ final class Fitter<Solution_, In_, Out_, Score_ extends Score<Score_>>
         entityPlacer.stepStarted(stepScope);
         try (var processor = getProcessor(scoreDirector, originalScore, clonedElement)) {
             for (var placement : entityPlacer) {
-                CompletableFuture<Void> allTasksFinished = CompletableFuture.completedFuture(null);
+                var futureList = new ArrayList<CompletableFuture<Void>>();
                 for (var move : placement) {
-                    allTasksFinished = CompletableFuture.allOf(allTasksFinished, processor.execute(move));
+                    futureList.add(processor.execute(move));
                 }
+                var allTasksFinished = CompletableFuture.allOf(futureList.toArray(CompletableFuture[]::new));
                 allTasksFinished.join(); // Wait for all tasks to finish.
                 scoreDirector.calculateScore(); // Return solution to original state.
                 return processor.getRecommendations(); // There are no other unassigned elements to evaluate.
