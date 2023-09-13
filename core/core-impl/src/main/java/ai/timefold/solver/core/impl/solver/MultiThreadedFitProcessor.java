@@ -19,15 +19,13 @@ import ai.timefold.solver.core.impl.solver.thread.DefaultSolverThreadFactory;
 final class MultiThreadedFitProcessor<Solution_, In_, Out_, Score_ extends Score<Score_>>
         implements FitProcessor<Solution_, Out_, Score_> {
 
-    private record ThreadState<Solution_, In_, Out_, Score_ extends Score<Score_>>(
-            InnerScoreDirector<Solution_, Score_> scoreDirector, In_ clonedElement, List<RecommendedFit<Out_, Score_>> bufferList) {
-    }
-
     private final ThreadLocal<ThreadState<Solution_, In_, Out_, Score_>> threadLocalState;
     private final Function<In_, Out_> valueResultFunction;
     private final Score_ originalScore;
     private final ExecutorService executorService;
-    private final Map<InnerScoreDirector<Solution_, Score_>, List<RecommendedFit<Out_, Score_>>> recommendationBuffer = new ConcurrentHashMap<>();
+    private final Map<InnerScoreDirector<Solution_, Score_>, List<RecommendedFit<Out_, Score_>>> recommendationBuffer =
+            new ConcurrentHashMap<>();
+    private long unsignedCounter = 0;
 
     public MultiThreadedFitProcessor(int moveThreadCount, InnerScoreDirector<Solution_, Score_> scoreDirector,
             Function<In_, Out_> valueResultFunction, Score_ originalScore, In_ originalElement) {
@@ -46,6 +44,7 @@ final class MultiThreadedFitProcessor<Solution_, In_, Out_, Score_ extends Score
 
     @Override
     public CompletableFuture<Void> execute(Move<Solution_> move) {
+        long id = unsignedCounter++;
         return CompletableFuture.runAsync(() -> {
             try {
                 var state = threadLocalState.get();
@@ -57,7 +56,7 @@ final class MultiThreadedFitProcessor<Solution_, In_, Out_, Score_ extends Score
                 undo.doMoveOnly(scoreDirector);
                 var newScoreDifference = newScore.subtract(originalScore)
                         .withInitScore(0);
-                var recommendedFit = new DefaultRecommendedFit<>(result, newScoreDifference);
+                var recommendedFit = new DefaultRecommendedFit<>(id, result, newScoreDifference);
                 state.bufferList.add(recommendedFit);
             } catch (Exception ex) {
                 throw new IllegalStateException("Recommendation execution threw an exception.", ex);
@@ -84,4 +83,10 @@ final class MultiThreadedFitProcessor<Solution_, In_, Out_, Score_ extends Score
         }
         executorService.shutdownNow();
     }
+
+    private record ThreadState<Solution_, In_, Out_, Score_ extends Score<Score_>>(
+            InnerScoreDirector<Solution_, Score_> scoreDirector, In_ clonedElement,
+            List<RecommendedFit<Out_, Score_>> bufferList) {
+    }
+
 }

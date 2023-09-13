@@ -3,7 +3,7 @@ package ai.timefold.solver.core.impl.solver;
 import ai.timefold.solver.core.api.score.Score;
 import ai.timefold.solver.core.api.solver.RecommendedFit;
 
-record DefaultRecommendedFit<Result_, Score_ extends Score<Score_>>(Result_ result, Score_ scoreDifference)
+record DefaultRecommendedFit<Result_, Score_ extends Score<Score_>>(long index, Result_ result, Score_ scoreDifference)
         implements
             RecommendedFit<Result_, Score_>,
             Comparable<DefaultRecommendedFit<Result_, Score_>> {
@@ -13,9 +13,12 @@ record DefaultRecommendedFit<Result_, Score_ extends Score<Score_>>(Result_ resu
         if (scoreComparison != 0) {
             return -scoreComparison; // Better scores first.
         } else if (result instanceof Comparable comparableResult) {
-            return comparableResult.compareTo(other.result);
-        } else {
-            return 0; // Do not reorder recommendations which are otherwise equal.
+            int comparison = comparableResult.compareTo(other.result);
+            if (comparison != 0) { // The user specified the order in which they want to see the results.
+                return comparison;
+            }
         }
+        // Otherwise maintain insertion order.
+        return Long.compareUnsigned(index, other.index); // Unsigned == many more positive values.
     }
 }
