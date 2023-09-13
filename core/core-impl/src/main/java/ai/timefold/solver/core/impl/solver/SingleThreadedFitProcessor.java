@@ -18,6 +18,7 @@ final class SingleThreadedFitProcessor<Solution_, In_, Out_, Score_ extends Scor
     private final Score_ originalScore;
     private final In_ clonedElement;
     private final List<RecommendedFit<Out_, Score_>> recommendationList = new ArrayList<>();
+    private long unsignedCounter = 0;
 
     public SingleThreadedFitProcessor(InnerScoreDirector<Solution_, Score_> scoreDirector,
             Function<In_, Out_> valueResultFunction, Score_ originalScore, In_ clonedElement) {
@@ -34,7 +35,7 @@ final class SingleThreadedFitProcessor<Solution_, In_, Out_, Score_ extends Scor
         var newScoreDifference = newScore.subtract(originalScore)
                 .withInitScore(0);
         var result = valueResultFunction.apply(clonedElement);
-        var recommendation = new DefaultRecommendedFit<>(result, newScoreDifference);
+        var recommendation = new DefaultRecommendedFit<>(unsignedCounter++, result, newScoreDifference);
         recommendationList.add(recommendation);
         undo.doMoveOnly(scoreDirector);
         return CompletableFuture.completedFuture(null);
