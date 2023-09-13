@@ -28,9 +28,9 @@
   </termination>
 
   <!-- Power tweaked optimization algorithms configuration -->
-  <!--<constructionHeuristic>-->
-    <!--<constructionHeuristicType>FIRST_FIT_DECREASING</constructionHeuristicType>-->
-  <!--</constructionHeuristic>-->
+  <constructionHeuristic>
+    <constructionHeuristicType>FIRST_FIT_DECREASING</constructionHeuristicType>
+  </constructionHeuristic>
   <!--<localSearch>-->
     <!--<unionMoveSelector>-->
       <!--<changeMoveSelector/>-->
