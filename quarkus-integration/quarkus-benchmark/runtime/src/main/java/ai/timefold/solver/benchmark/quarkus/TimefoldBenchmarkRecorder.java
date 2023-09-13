@@ -68,12 +68,12 @@ public class TimefoldBenchmarkRecorder {
         if (inheritedTerminationConfig == null || !inheritedTerminationConfig.isConfigured()) {
             List<SolverBenchmarkConfig> solverBenchmarkConfigList = plannerBenchmarkConfig.getSolverBenchmarkConfigList();
             if (solverBenchmarkConfigList == null) {
-                throw new IllegalStateException("At least one of the properties " +
-                        "quarkus.timefold.benchmark.solver.termination.spent-limit, " +
-                        "quarkus.timefold.benchmark.solver.termination.best-score-limit, " +
-                        "quarkus.timefold.benchmark.solver.termination.unimproved-spent-limit " +
-                        "is required if termination is not configured in the " +
-                        "inherited solver benchmark config and solverBenchmarkBluePrint is used.");
+                throw new IllegalStateException(("At least one of the properties %s, %s, %s is required " +
+                        "if termination is not configured in the inherited solver benchmark config " +
+                        "when solverBenchmarkBluePrint is used.")
+                        .formatted("quarkus.timefold.benchmark.solver.termination.spent-limit",
+                                "quarkus.timefold.benchmark.solver.termination.best-score-limit",
+                                "quarkus.timefold.benchmark.solver.termination.unimproved-spent-limit"));
             }
             for (int i = 0; i < solverBenchmarkConfigList.size(); i++) {
                 SolverBenchmarkConfig solverBenchmarkConfig = solverBenchmarkConfigList.get(i);
