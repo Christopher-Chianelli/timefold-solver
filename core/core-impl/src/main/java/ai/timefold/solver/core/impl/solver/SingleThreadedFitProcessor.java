@@ -2,7 +2,7 @@ package ai.timefold.solver.core.impl.solver;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Semaphore;
 import java.util.function.Function;
 
 import ai.timefold.solver.core.api.score.Score;
@@ -29,16 +29,19 @@ final class SingleThreadedFitProcessor<Solution_, In_, Out_, Score_ extends Scor
     }
 
     @Override
-    public CompletableFuture<Void> execute(Move<Solution_> move) {
-        var undo = move.doMove(scoreDirector);
-        var newScore = scoreDirector.calculateScore();
-        var newScoreDifference = newScore.subtract(originalScore)
-                .withInitScore(0);
-        var result = valueResultFunction.apply(clonedElement);
-        var recommendation = new DefaultRecommendedFit<>(unsignedCounter++, result, newScoreDifference);
-        recommendationList.add(recommendation);
-        undo.doMoveOnly(scoreDirector);
-        return CompletableFuture.completedFuture(null);
+    public void execute(Move<Solution_> move, Semaphore finishedMoveSemaphore) {
+        try {
+            var undo = move.doMove(scoreDirector);
+            var newScore = scoreDirector.calculateScore();
+            var newScoreDifference = newScore.subtract(originalScore)
+                    .withInitScore(0);
+            var result = valueResultFunction.apply(clonedElement);
+            var recommendation = new DefaultRecommendedFit<>(unsignedCounter++, result, newScoreDifference);
+            recommendationList.add(recommendation);
+            undo.doMoveOnly(scoreDirector);
+        } finally {
+            finishedMoveSemaphore.release();
+        }
     }
 
     @Override

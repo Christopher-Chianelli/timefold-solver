@@ -1,10 +1,9 @@
 package ai.timefold.solver.core.impl.solver;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Random;
-import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Semaphore;
 import java.util.function.Function;
 
 import ai.timefold.solver.core.api.score.Score;
@@ -59,14 +58,24 @@ final class Fitter<Solution_, In_, Out_, Score_ extends Score<Score_>>
         entityPlacer.stepStarted(stepScope);
         try (var processor = getProcessor(scoreDirector, originalScore, clonedElement)) {
             for (var placement : entityPlacer) {
-                var futureList = new ArrayList<CompletableFuture<Void>>();
+                long start = System.nanoTime();
+                var finishedMoveSemaphore = new Semaphore(0);
+                var moveCount = 0;
                 for (var move : placement) {
-                    futureList.add(processor.execute(move));
+                    processor.execute(move, finishedMoveSemaphore);
+                    moveCount++;
                 }
-                var allTasksFinished = CompletableFuture.allOf(futureList.toArray(CompletableFuture[]::new));
-                allTasksFinished.join(); // Wait for all tasks to finish.
+                finishedMoveSemaphore.acquire(moveCount); // Wait for all tasks to finish.
+                long end = System.nanoTime();
+                System.out.println("Eval moves take " + (end - start));
+
                 scoreDirector.calculateScore(); // Return solution to original state.
-                return processor.getRecommendations(); // There are no other unassigned elements to evaluate.
+
+                start = System.nanoTime();
+                var out = processor.getRecommendations(); // There are no other unassigned elements to evaluate.
+                end = System.nanoTime();
+                System.out.println("Sort moves take " + (end - start));
+                return out;
             }
             throw new IllegalStateException("""
                     Impossible state: entity placer (%s) has no placements.
