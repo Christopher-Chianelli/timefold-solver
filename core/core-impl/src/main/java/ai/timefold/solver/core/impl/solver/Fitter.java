@@ -62,13 +62,11 @@ final class Fitter<Solution_, In_, Out_, Score_ extends Score<Score_>>
                 List<RecommendedFit<Out_, Score_>> recommendedFitList = new CopyOnWriteArrayList<>();
                 CompletableFuture<Void> allTasksFinished = CompletableFuture.completedFuture(null);
                 for (var move : placement) {
-                    var partialTaskFinished = processor.execute(move).thenAccept(recommendedFitList::add);
-                    allTasksFinished = CompletableFuture.allOf(allTasksFinished, partialTaskFinished);
+                    allTasksFinished = CompletableFuture.allOf(allTasksFinished, processor.execute(move));
                 }
                 allTasksFinished.join(); // Wait for all tasks to finish.
                 scoreDirector.calculateScore(); // Return solution to original state.
-                recommendedFitList.sort(null);
-                return recommendedFitList; // There are no other unassigned elements to evaluate.
+                return processor.getRecommendations(); // There are no other unassigned elements to evaluate.
             }
             throw new IllegalStateException("""
                     Impossible state: entity placer (%s) has no placements.
