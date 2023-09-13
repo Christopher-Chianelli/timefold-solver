@@ -4,7 +4,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Random;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Function;
 
 import ai.timefold.solver.core.api.score.Score;
@@ -59,7 +58,6 @@ final class Fitter<Solution_, In_, Out_, Score_ extends Score<Score_>>
         entityPlacer.stepStarted(stepScope);
         try (var processor = getProcessor(scoreDirector, originalScore, clonedElement)) {
             for (var placement : entityPlacer) {
-                List<RecommendedFit<Out_, Score_>> recommendedFitList = new CopyOnWriteArrayList<>();
                 CompletableFuture<Void> allTasksFinished = CompletableFuture.completedFuture(null);
                 for (var move : placement) {
                     allTasksFinished = CompletableFuture.allOf(allTasksFinished, processor.execute(move));
