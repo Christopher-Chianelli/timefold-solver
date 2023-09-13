@@ -1,16 +1,15 @@
 package ai.timefold.solver.examples.cloudbalancing.app;
 
-import java.io.File;
-import java.time.Duration;
+import java.util.List;
 
 import ai.timefold.solver.core.api.score.buildin.hardsoft.HardSoftScore;
 import ai.timefold.solver.core.api.solver.SolutionManager;
-import ai.timefold.solver.core.api.solver.Solver;
 import ai.timefold.solver.core.api.solver.SolverFactory;
 import ai.timefold.solver.core.config.solver.SolverConfig;
 import ai.timefold.solver.examples.cloudbalancing.domain.CloudBalance;
 import ai.timefold.solver.examples.cloudbalancing.domain.CloudProcess;
 import ai.timefold.solver.examples.cloudbalancing.persistence.CloudBalanceSolutionFileIO;
+import ai.timefold.solver.examples.cloudbalancing.persistence.CloudBalancingGenerator;
 import ai.timefold.solver.examples.cloudbalancing.swingui.CloudBalancingPanel;
 import ai.timefold.solver.examples.common.app.CommonApp;
 import ai.timefold.solver.persistence.common.api.domain.solution.SolutionFileIO;
@@ -24,17 +23,27 @@ public class CloudBalancingApp extends CommonApp<CloudBalance> {
 
     public static final String DATA_DIR_NAME = "cloudbalancing";
 
-    public static void main(String[] args) {
-        SolverFactory<CloudBalance> solverFactory = SolverFactory.createFromXmlResource(SOLVER_CONFIG);
-        Solver<CloudBalance> solver = solverFactory.buildSolver();
-        CloudBalance solution = solver.solve(new CloudBalanceSolutionFileIO()
-                .read(new File("data/cloudbalancing/unsolved/1600computers-4800processes.json")));
-        CloudProcess process = solution.getProcessList().get(0);
-        process.setComputer(null);
+    private static final int MAX_MOVE_THREAD_COUNT = 8;
+    private static final int TRIALS_PER_DATASET = 100;
 
-        for (int moveThreadCount = 0; moveThreadCount < 16; moveThreadCount = Math.max(1, moveThreadCount * 2)) {
-            run(solution, process, moveThreadCount);
+    public static void main(String[] args) {
+        CloudBalancingGenerator generator = new CloudBalancingGenerator();
+        CloudBalance solution100k = generator.createCloudBalance(100_000, 1);
+        CloudBalance solution10k = generator.createCloudBalance(10_000, 1);
+        CloudBalance solution1k = generator.createCloudBalance(1_000, 1);
+        CloudBalance solution100 = generator.createCloudBalance(100, 1);
+        var solutions = List.of(solution100, solution1k, solution10k, solution100k);
+
+        for (var solution: solutions) {
+            System.out.println("Fitting " + solution.getComputerList().size() + " computers");
+            for (int moveThreadCount = 0;
+                 moveThreadCount <= MAX_MOVE_THREAD_COUNT;
+                 moveThreadCount = Math.max(1, moveThreadCount * 2)) {
+                run(solution, solution.getProcessList().get(0), moveThreadCount);
+            }
+            System.out.println();
         }
+
     }
 
     private static void run(CloudBalance solution, CloudProcess process, int moveThreadCount) {
@@ -43,15 +52,15 @@ public class CloudBalancingApp extends CommonApp<CloudBalance> {
         SolverFactory<CloudBalance> factory = SolverFactory.create(solverConfig);
         SolutionManager<CloudBalance, HardSoftScore> solutionManager = SolutionManager.create(factory);
         long totalTime = 0;
-        for (int j = 0; j < 1_000; j++) {
+        for (int trial = 0; trial < TRIALS_PER_DATASET; trial++) {
             long startTime = System.nanoTime();
             var recommendedFitList =
                     solutionManager.recommendFit(solution, process, CloudProcess::getComputer);
             long endTime = System.nanoTime() - startTime;
             totalTime += endTime;
         }
-        System.out.printf("Move thread count: %2d - Average time: %2d millis%n",
-                moveThreadCount, Duration.ofNanos(totalTime / 1_000).toMillis());
+        System.out.printf("Move thread count: %2d - Average time: %2d nanos%n",
+                moveThreadCount, totalTime / TRIALS_PER_DATASET);
     }
 
     public CloudBalancingApp() {
