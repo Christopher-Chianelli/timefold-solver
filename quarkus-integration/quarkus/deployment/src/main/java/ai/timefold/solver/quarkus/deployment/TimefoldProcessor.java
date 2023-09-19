@@ -43,6 +43,7 @@ import ai.timefold.solver.quarkus.bean.DefaultTimefoldBeanProvider;
 import ai.timefold.solver.quarkus.bean.UnavailableTimefoldBeanProvider;
 import ai.timefold.solver.quarkus.config.TimefoldRuntimeConfig;
 import ai.timefold.solver.quarkus.deployment.config.TimefoldBuildTimeConfig;
+import ai.timefold.solver.quarkus.deployment.lambda.ConstraintProviderLambdaProcessor;
 import ai.timefold.solver.quarkus.devui.TimefoldDevUIPropertiesSupplier;
 import ai.timefold.solver.quarkus.gizmo.TimefoldGizmoBeanFactory;
 
@@ -243,6 +244,7 @@ class TimefoldProcessor {
         generateConstraintVerifier(solverConfig, syntheticBeanBuildItemBuildProducer);
         GeneratedGizmoClasses generatedGizmoClasses = generateDomainAccessors(solverConfig, indexView, generatedBeans,
                 generatedClasses, transformers, reflectiveClassSet);
+        shareLambdas(solverConfig, transformers);
 
         SolverManagerConfig solverManagerConfig = new SolverManagerConfig();
 
@@ -514,6 +516,15 @@ class TimefoldProcessor {
         } catch (ClassNotFoundException e) {
             throw new IllegalStateException("The class (" + className
                     + ") cannot be created during deployment.", e);
+        }
+    }
+
+    private void shareLambdas(SolverConfig solverConfig,
+            BuildProducer<BytecodeTransformerBuildItem> transformers) {
+        Class<? extends ConstraintProvider> constraintProviderClass =
+                solverConfig.getScoreDirectorFactoryConfig().getConstraintProviderClass();
+        if (constraintProviderClass != null) {
+            ConstraintProviderLambdaProcessor.shareLambdas(solverConfig, transformers);
         }
     }
 
