@@ -59,8 +59,8 @@ public class CloudBalancingApp extends CommonApp<CloudBalance> {
             long endTime = System.nanoTime() - startTime;
             totalTime += endTime;
         }
-        System.out.printf("Move thread count: %2d - Average time: %2d nanos%n",
-                moveThreadCount, totalTime / TRIALS_PER_DATASET);
+        System.out.printf("Move thread count: %2d - Average per computer: %5d nanos%n",
+                moveThreadCount, totalTime / TRIALS_PER_DATASET / solution.getComputerList().size());
     }
 
     public CloudBalancingApp() {

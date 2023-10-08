@@ -2,53 +2,62 @@ package ai.timefold.solver.core.impl.solver;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
+import java.util.Random;
 import java.util.function.Function;
 
 import ai.timefold.solver.core.api.score.Score;
 import ai.timefold.solver.core.api.solver.RecommendedFit;
-import ai.timefold.solver.core.impl.heuristic.move.Move;
+import ai.timefold.solver.core.api.solver.SolverFactory;
+import ai.timefold.solver.core.impl.constructionheuristic.scope.ConstructionHeuristicPhaseScope;
+import ai.timefold.solver.core.impl.constructionheuristic.scope.ConstructionHeuristicStepScope;
 import ai.timefold.solver.core.impl.score.director.InnerScoreDirector;
+import ai.timefold.solver.core.impl.solver.scope.SolverScope;
 
 final class SingleThreadedFitProcessor<Solution_, In_, Out_, Score_ extends Score<Score_>>
-        implements FitProcessor<Solution_, Out_, Score_> {
+        extends AbstractFitProcessor<Solution_, In_, Out_, Score_> {
 
-    private final InnerScoreDirector<Solution_, Score_> scoreDirector;
     private final Function<In_, Out_> valueResultFunction;
-    private final Score_ originalScore;
     private final In_ clonedElement;
-    private final List<RecommendedFit<Out_, Score_>> recommendationList = new ArrayList<>();
-    private long unsignedCounter = 0;
 
-    public SingleThreadedFitProcessor(InnerScoreDirector<Solution_, Score_> scoreDirector,
-            Function<In_, Out_> valueResultFunction, Score_ originalScore, In_ clonedElement) {
-        this.scoreDirector = scoreDirector;
+    public SingleThreadedFitProcessor(SolverFactory<Solution_> solverFactory, Function<In_, Out_> valueResultFunction,
+            Score_ originalScore, In_ clonedElement) {
+        super(solverFactory, originalScore);
         this.valueResultFunction = valueResultFunction;
-        this.originalScore = originalScore;
         this.clonedElement = clonedElement;
     }
 
     @Override
-    public CompletableFuture<Void> execute(Move<Solution_> move) {
-        var undo = move.doMove(scoreDirector);
-        var newScore = scoreDirector.calculateScore();
-        var newScoreDifference = newScore.subtract(originalScore)
-                .withInitScore(0);
-        var result = valueResultFunction.apply(clonedElement);
-        var recommendation = new DefaultRecommendedFit<>(unsignedCounter++, result, newScoreDifference);
-        recommendationList.add(recommendation);
-        undo.doMoveOnly(scoreDirector);
-        return CompletableFuture.completedFuture(null);
+    public List<RecommendedFit<Out_, Score_>> apply(InnerScoreDirector<Solution_, Score_> scoreDirector) {
+        var entityPlacer = buildEntityPlacer();
+
+        var solverScope = new SolverScope<Solution_>();
+        solverScope.setWorkingRandom(new Random(0)); // We will evaluate every option; random does not matter.
+        solverScope.setScoreDirector(scoreDirector);
+        var phaseScope = new ConstructionHeuristicPhaseScope<>(solverScope);
+        var stepScope = new ConstructionHeuristicStepScope<>(phaseScope);
+        entityPlacer.solvingStarted(solverScope);
+        entityPlacer.phaseStarted(phaseScope);
+        entityPlacer.stepStarted(stepScope);
+
+        try (scoreDirector) {
+            for (var placement : entityPlacer) {
+                var recommendedFitList = new ArrayList<RecommendedFit<Out_, Score_>>();
+                var moveIndex = 0L;
+                for (var move : placement) {
+                    recommendedFitList.add(execute(scoreDirector, move, moveIndex, clonedElement, valueResultFunction));
+                    moveIndex++;
+                }
+                recommendedFitList.sort(null);
+                return recommendedFitList;
+            }
+            throw new IllegalStateException("""
+                    Impossible state: entity placer (%s) has no placements.
+                    """.formatted(entityPlacer));
+        } finally {
+            entityPlacer.stepEnded(stepScope);
+            entityPlacer.phaseEnded(phaseScope);
+            entityPlacer.solvingEnded(solverScope);
+        }
     }
 
-    @Override
-    public List<RecommendedFit<Out_, Score_>> getRecommendations() {
-        recommendationList.sort(null);
-        return recommendationList;
-    }
-
-    @Override
-    public void close() {
-        // No need to do anything.
-    }
 }
