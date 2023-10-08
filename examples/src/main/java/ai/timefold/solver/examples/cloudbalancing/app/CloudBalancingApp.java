@@ -34,6 +34,16 @@ public class CloudBalancingApp extends CommonApp<CloudBalance> {
         CloudBalance solution100 = generator.createCloudBalance(100, 1);
         var solutions = List.of(solution100, solution1k, solution10k, solution100k);
 
+        System.out.println("Warming up...");
+        for (var solution: solutions.subList(0, 3)) { // Don't use the largest data sets in the interest of time.
+            for (int i = 0; i < 2; i++) {
+                run(solution, solution.getProcessList().get(0), 0);
+                run(solution, solution.getProcessList().get(0), 2);
+            }
+        }
+        System.out.println("Warmup complete.");
+        System.out.println();
+
         for (var solution: solutions) {
             System.out.println("Fitting " + solution.getComputerList().size() + " computers");
             for (int moveThreadCount = 0;
