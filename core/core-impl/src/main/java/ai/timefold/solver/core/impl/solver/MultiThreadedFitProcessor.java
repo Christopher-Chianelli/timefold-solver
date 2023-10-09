@@ -61,14 +61,15 @@ final class MultiThreadedFitProcessor<Solution_, In_, Out_, Score_ extends Score
         }
     }
 
-    private void run(InnerScoreDirector<Solution_, Score_> parentScoreDirector, SortedSet<RecommendedFit<Out_, Score_>> targetCollection) {
+    private void run(InnerScoreDirector<Solution_, Score_> parentScoreDirector,
+            SortedSet<RecommendedFit<Out_, Score_>> targetCollection) {
         var entityPlacer = buildEntityPlacer();
         var solverScope = new SolverScope<Solution_>();
         var phaseScope = new ConstructionHeuristicPhaseScope<>(solverScope);
         var stepScope = new ConstructionHeuristicStepScope<>(phaseScope);
 
         try (InnerScoreDirector<Solution_, Score_> childScoreDirector =
-                parentScoreDirector.createChildThreadScoreDirector(ChildThreadType.MOVE_THREAD)) {
+                parentScoreDirector.createChildThreadScoreDirector(ChildThreadType.RECOMMENDATION_THREAD)) {
             solverScope.setWorkingRandom(new Random(0)); // We will evaluate every option; random does not matter.
             solverScope.setScoreDirector(childScoreDirector);
 
@@ -79,7 +80,7 @@ final class MultiThreadedFitProcessor<Solution_, In_, Out_, Score_ extends Score
             // On the child score director, we need to look up the working object for the cloned element.
             Function<In_, Out_> threadPropositionFunction =
                     in -> parentScoreDirector.lookUpWorkingObject(valueResultFunction.apply(in));
-            var threadClonedElement = childScoreDirector.lookUpWorkingObject(clonedElement);
+            var threadClonedElement = childScoreDirector.getWorkingObjectByLinearProbe(clonedElement);
 
             for (var placement : entityPlacer) {
                 var moveIndex = 0L;

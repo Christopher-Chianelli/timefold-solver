@@ -10,6 +10,7 @@ import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -304,6 +305,12 @@ public abstract class AbstractScoreDirector<Solution_, Score_ extends Score<Scor
                             .buildScoreDirector(true, constraintMatchEnabledPreference);
             childThreadScoreDirector.setWorkingSolution(cloneWorkingSolution());
             return childThreadScoreDirector;
+        } else if (childThreadType == ChildThreadType.RECOMMENDATION_THREAD) {
+            AbstractScoreDirector<Solution_, Score_, Factory_> childThreadScoreDirector =
+                    (AbstractScoreDirector<Solution_, Score_, Factory_>) scoreDirectorFactory
+                            .buildScoreDirector(false, constraintMatchEnabledPreference);
+            childThreadScoreDirector.setWorkingSolution(cloneWorkingSolution());
+            return childThreadScoreDirector;
         } else {
             throw new IllegalStateException("The childThreadType (" + childThreadType + ") is not implemented.");
         }
@@ -528,6 +535,32 @@ public abstract class AbstractScoreDirector<Solution_, Score_ extends Score<Scor
             lookUpManager.removeWorkingObject(problemFact);
         }
         variableListenerSupport.resetWorkingSolution(); // TODO do not nuke the variable listeners
+    }
+
+    @Override
+    public <E> E getWorkingObjectByLinearProbe(E externalObject) {
+        AtomicReference<E> workingObject = new AtomicReference<>();
+        MemberAccessor planningIdAccessor = getSolutionDescriptor().getPlanningIdAccessor(externalObject.getClass());
+        Object externalObjectPlanningId = planningIdAccessor.executeGetter(externalObject);
+        getSolutionDescriptor()
+                .visitEntitiesByEntityClass(workingSolution,
+                        externalObject.getClass(),
+                        maybeWorkingObject -> {
+                            if (Objects.equals(externalObjectPlanningId,
+                                    planningIdAccessor.executeGetter(maybeWorkingObject))) {
+                                if (workingObject.getAndSet((E) maybeWorkingObject) != null) {
+                                    throw new IllegalStateException("Impossible state: multiple (" + externalObject.getClass()
+                                            .getSimpleName() + ") objects have the same @PlanningId ("
+                                            + externalObjectPlanningId + ").");
+                                }
+                            }
+                        });
+        E out = workingObject.get();
+        if (out == null) {
+            throw new IllegalArgumentException(
+                    "Impossible state: the external object (" + externalObject + ") is not present in the working solution.");
+        }
+        return out;
     }
 
     @Override

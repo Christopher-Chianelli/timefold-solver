@@ -40,9 +40,10 @@ final class Fitter<Solution_, In_, Out_, Score_ extends Score<Score_>>
 
         // Recommendation API scales linearly, no need for artificial upper move thread count limit.
         var moveThreadCount = solverFactory.resolveMoveThreadCount(false);
-        var processor = moveThreadCount == null ?
-                new SingleThreadedFitProcessor<>(solverFactory, propositionFunction, originalScore, clonedElement) :
-                new MultiThreadedFitProcessor<>(solverFactory, propositionFunction, originalScore, clonedElement, moveThreadCount);
+        var processor = moveThreadCount == null
+                ? new SingleThreadedFitProcessor<>(solverFactory, propositionFunction, originalScore, clonedElement)
+                : new MultiThreadedFitProcessor<>(solverFactory, propositionFunction, originalScore, clonedElement,
+                        moveThreadCount);
         return processor.apply(scoreDirector); // TODO enterprise
     }
 

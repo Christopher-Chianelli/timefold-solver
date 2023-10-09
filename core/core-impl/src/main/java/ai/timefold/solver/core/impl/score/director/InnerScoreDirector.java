@@ -283,6 +283,17 @@ public interface InnerScoreDirector<Solution_, Score_ extends Score<Score_>>
     void assertNonNullPlanningIds();
 
     /**
+     * Does a linear probe to find a working entity with the same planning id as the external object, even when lookup is
+     * disabled. Used in the recommendation API, since building the full lookup map is costly and only a single lookup is
+     * needed.
+     *
+     * @param externalObject The entity to lookup
+     * @return The working entity
+     * @throws IllegalArgumentException if the externalObject is not in the working solution
+     */
+    <E> E getWorkingObjectByLinearProbe(E externalObject);
+
+    /**
      * Needs to be called after use because some implementations need to clean up their resources.
      */
     @Override
