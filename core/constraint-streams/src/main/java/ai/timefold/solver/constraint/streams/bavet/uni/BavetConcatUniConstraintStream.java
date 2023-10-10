@@ -6,6 +6,7 @@ import java.util.Set;
 import ai.timefold.solver.constraint.streams.bavet.BavetConstraintFactory;
 import ai.timefold.solver.constraint.streams.bavet.common.BavetAbstractConstraintStream;
 import ai.timefold.solver.constraint.streams.bavet.common.BavetJoinConstraintStream;
+import ai.timefold.solver.constraint.streams.bavet.common.DistinctParentsConcatTupleLifecycle;
 import ai.timefold.solver.constraint.streams.bavet.common.NodeBuildHelper;
 import ai.timefold.solver.constraint.streams.bavet.common.bridge.BavetForeBridgeUniConstraintStream;
 import ai.timefold.solver.constraint.streams.bavet.common.tuple.TupleLifecycle;
@@ -45,12 +46,18 @@ public final class BavetConcatUniConstraintStream<Solution_, A> extends BavetAbs
     @Override
     public <Score_ extends Score<Score_>> void buildNode(NodeBuildHelper<Score_> buildHelper) {
         TupleLifecycle<UniTuple<A>> downstream = buildHelper.getAggregatedTupleLifecycle(childStreamList);
-        int outputStoreSize = buildHelper.extractTupleStoreSize(this);
-        var node = new BavetUniConcatNode<>(downstream,
-                buildHelper.reserveTupleStoreIndex(leftParent.getTupleSource()),
-                buildHelper.reserveTupleStoreIndex(rightParent.getTupleSource()),
-                outputStoreSize);
-        buildHelper.addNode(node, this, leftParent, rightParent);
+
+        if (!Objects.equals(leftParent.getTupleSource(), rightParent.getTupleSource())) {
+            DistinctParentsConcatTupleLifecycle<UniTuple<A>> lifecycle = new DistinctParentsConcatTupleLifecycle<>(downstream);
+            buildHelper.addNode(lifecycle, this, leftParent, rightParent);
+        } else {
+            int outputStoreSize = buildHelper.extractTupleStoreSize(this);
+            var node = new BavetUniConcatNode<>(downstream,
+                    buildHelper.reserveTupleStoreIndex(leftParent.getTupleSource()),
+                    buildHelper.reserveTupleStoreIndex(rightParent.getTupleSource()),
+                    outputStoreSize);
+            buildHelper.addNode(node, this, leftParent, rightParent);
+        }
     }
 
     // ************************************************************************

@@ -6,6 +6,7 @@ import java.util.Set;
 import ai.timefold.solver.constraint.streams.bavet.BavetConstraintFactory;
 import ai.timefold.solver.constraint.streams.bavet.common.BavetAbstractConstraintStream;
 import ai.timefold.solver.constraint.streams.bavet.common.BavetJoinConstraintStream;
+import ai.timefold.solver.constraint.streams.bavet.common.DistinctParentsConcatTupleLifecycle;
 import ai.timefold.solver.constraint.streams.bavet.common.NodeBuildHelper;
 import ai.timefold.solver.constraint.streams.bavet.common.bridge.BavetForeBridgeBiConstraintStream;
 import ai.timefold.solver.constraint.streams.bavet.common.tuple.BiTuple;
@@ -45,12 +46,19 @@ public final class BavetConcatBiConstraintStream<Solution_, A, B> extends BavetA
     @Override
     public <Score_ extends Score<Score_>> void buildNode(NodeBuildHelper<Score_> buildHelper) {
         TupleLifecycle<BiTuple<A, B>> downstream = buildHelper.getAggregatedTupleLifecycle(childStreamList);
-        int outputStoreSize = buildHelper.extractTupleStoreSize(this);
-        var node = new BavetBiConcatNode<>(downstream,
-                buildHelper.reserveTupleStoreIndex(leftParent.getTupleSource()),
-                buildHelper.reserveTupleStoreIndex(rightParent.getTupleSource()),
-                outputStoreSize);
-        buildHelper.addNode(node, this, leftParent, rightParent);
+
+        if (!Objects.equals(leftParent.getTupleSource(), rightParent.getTupleSource())) {
+            DistinctParentsConcatTupleLifecycle<BiTuple<A, B>> lifecycle =
+                    new DistinctParentsConcatTupleLifecycle<>(downstream);
+            buildHelper.addNode(lifecycle, this, leftParent, rightParent);
+        } else {
+            int outputStoreSize = buildHelper.extractTupleStoreSize(this);
+            var node = new BavetBiConcatNode<>(downstream,
+                    buildHelper.reserveTupleStoreIndex(leftParent.getTupleSource()),
+                    buildHelper.reserveTupleStoreIndex(rightParent.getTupleSource()),
+                    outputStoreSize);
+            buildHelper.addNode(node, this, leftParent, rightParent);
+        }
     }
 
     // ************************************************************************

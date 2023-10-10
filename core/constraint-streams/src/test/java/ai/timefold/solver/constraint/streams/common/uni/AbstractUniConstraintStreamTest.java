@@ -2296,9 +2296,11 @@ public abstract class AbstractUniConstraintStreamTest
         scoreDirector.beforeVariableChanged(entity1, "value");
         entity1.setValue(value3);
         scoreDirector.afterVariableChanged(entity1, "value");
+
         scoreDirector.beforeVariableChanged(entity3, "value");
         entity3.setValue(value1);
         scoreDirector.afterVariableChanged(entity3, "value");
+
         assertScore(scoreDirector,
                 assertMatch(entity2),
                 assertMatch(entity3));
