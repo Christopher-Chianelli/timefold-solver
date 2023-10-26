@@ -656,6 +656,11 @@ class TimefoldProcessor {
         }
 
         entityEnhancer.generateGizmoBeanFactory(beanClassOutput, reflectiveClassSet, transformers);
+        if (solverConfig.getScoreDirectorFactoryConfig() != null) {
+            NodeSharingConstraintProviderEnhancer constraintProviderEnhancer = new NodeSharingConstraintProviderEnhancer();
+            constraintProviderEnhancer.enhanceConstraintProvider(solverConfig.getScoreDirectorFactoryConfig()
+                    .getConstraintProviderClass(), transformers);
+        }
         return new GeneratedGizmoClasses(generatedMemberAccessorsClassNameSet, gizmoSolutionClonerClassNameSet);
     }
 
