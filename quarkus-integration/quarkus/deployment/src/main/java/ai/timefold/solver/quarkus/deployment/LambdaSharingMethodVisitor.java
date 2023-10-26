@@ -5,7 +5,23 @@ import java.lang.invoke.LambdaMetafactory;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
+import java.util.Arrays;
 import java.util.Map;
+import java.util.function.BiFunction;
+import java.util.function.BiPredicate;
+import java.util.function.Function;
+import java.util.function.Predicate;
+import java.util.function.ToIntBiFunction;
+import java.util.function.ToIntFunction;
+
+import ai.timefold.solver.core.api.function.PentaFunction;
+import ai.timefold.solver.core.api.function.PentaPredicate;
+import ai.timefold.solver.core.api.function.QuadFunction;
+import ai.timefold.solver.core.api.function.QuadPredicate;
+import ai.timefold.solver.core.api.function.ToIntQuadFunction;
+import ai.timefold.solver.core.api.function.ToIntTriFunction;
+import ai.timefold.solver.core.api.function.TriFunction;
+import ai.timefold.solver.core.api.function.TriPredicate;
 
 import org.objectweb.asm.Handle;
 import org.objectweb.asm.MethodVisitor;
@@ -29,7 +45,7 @@ public class LambdaSharingMethodVisitor extends InstructionAdapter {
     }
 
     public record InvokeDynamicArgs(String name, String descriptor, Handle bootstrapMethodHandle,
-            Object[] bootstrapMethodArguments) {
+            Object[] bootstrapMethodArguments, String signature) {
         public Type getFieldDescriptor() {
             return Type.getReturnType(descriptor);
         }
@@ -101,13 +117,14 @@ public class LambdaSharingMethodVisitor extends InstructionAdapter {
             return;
         }
         Handle methodHandle = (Handle) bootstrapMethodArguments[1];
-        Type genericSignature = (Type) bootstrapMethodArguments[2];
+        Type methodGenericSignature = (Type) bootstrapMethodArguments[2];
 
         if (!methodHandle.getOwner().equals(classInternalName)) {
             replaceMethodReference(name, descriptor, bootstrapMethodHandle, bootstrapMethodArguments, methodHandle,
-                    genericSignature);
+                    methodGenericSignature);
         } else {
-            replaceLambda(name, descriptor, bootstrapMethodHandle, bootstrapMethodArguments, methodHandle, genericSignature);
+            replaceLambda(name, descriptor, bootstrapMethodHandle, bootstrapMethodArguments, methodHandle,
+                    methodGenericSignature);
         }
     }
 
@@ -116,11 +133,11 @@ public class LambdaSharingMethodVisitor extends InstructionAdapter {
             final Handle bootstrapMethodHandle,
             final Object[] bootstrapMethodArguments,
             Handle methodHandle,
-            Type genericSignature) {
+            Type methodGenericSignature) {
         MethodReferenceId methodReferenceId =
-                new MethodReferenceId(new FunctionInterfaceId(descriptor, genericSignature), methodHandle);
+                new MethodReferenceId(new FunctionInterfaceId(descriptor, methodGenericSignature), methodHandle);
         replaceDynamicWithFieldRead(name, descriptor, bootstrapMethodHandle, bootstrapMethodArguments,
-                methodReferenceIdToGeneratedFieldName, methodReferenceId);
+                methodGenericSignature, methodReferenceIdToGeneratedFieldName, methodReferenceId);
     }
 
     private void replaceLambda(final String name,
@@ -128,18 +145,19 @@ public class LambdaSharingMethodVisitor extends InstructionAdapter {
             final Handle bootstrapMethodHandle,
             final Object[] bootstrapMethodArguments,
             Handle methodHandle,
-            Type genericSignature) {
+            Type methodGenericSignature) {
         String methodKey = getMethodId(methodHandle.getName(), methodHandle.getDesc());
         String canonicalMethodId = methodIdToCanonicalMethodId.get(methodKey);
-        LambdaId lambdaId = new LambdaId(new FunctionInterfaceId(descriptor, genericSignature), canonicalMethodId);
+        LambdaId lambdaId = new LambdaId(new FunctionInterfaceId(descriptor, methodGenericSignature), canonicalMethodId);
         replaceDynamicWithFieldRead(name, descriptor, bootstrapMethodHandle, bootstrapMethodArguments,
-                lambdaIdToGeneratedFieldName, lambdaId);
+                methodGenericSignature, lambdaIdToGeneratedFieldName, lambdaId);
     }
 
     private <Key_> void replaceDynamicWithFieldRead(final String name,
             final String descriptor,
             final Handle bootstrapMethodHandle,
             final Object[] bootstrapMethodArguments,
+            Type methodGenericSignature,
             Map<Key_, String> idToGeneratedField,
             Key_ id) {
         Type fieldType = Type.getReturnType(descriptor);
@@ -149,10 +167,79 @@ public class LambdaSharingMethodVisitor extends InstructionAdapter {
             return;
         }
         int fieldId = generatedFieldNameToInvokeDynamicArgs.size();
-        String generatedFieldName = "$timefoldSharedLambda$" + fieldId;
+        String generatedFieldName = "$timefoldSharedLambda" + fieldId;
+        String signature = FunctionalInterface.getInterfaceSignature(Type.getReturnType(descriptor), methodGenericSignature);
         generatedFieldNameToInvokeDynamicArgs.put(generatedFieldName,
-                new InvokeDynamicArgs(name, descriptor, bootstrapMethodHandle, bootstrapMethodArguments));
+                new InvokeDynamicArgs(name, descriptor, bootstrapMethodHandle, bootstrapMethodArguments, signature));
         idToGeneratedField.put(id, generatedFieldName);
         this.getstatic(classInternalName, generatedFieldName, fieldType.getDescriptor());
+    }
+
+    private enum FunctionalInterface {
+        // Predicates
+        PREDICATE(Predicate.class, Type::getArgumentTypes),
+        BI_PREDICATE(BiPredicate.class, Type::getArgumentTypes),
+        TRI_PREDICATE(TriPredicate.class, Type::getArgumentTypes),
+        QUAD_PREDICATE(QuadPredicate.class, Type::getArgumentTypes),
+        PENTA_PREDICATE(PentaPredicate.class, Type::getArgumentTypes),
+
+        // Functions
+        FUNCTION(Function.class, sig -> append(sig.getArgumentTypes(), sig.getReturnType())),
+        BI_FUNCTION(BiFunction.class, sig -> append(sig.getArgumentTypes(), sig.getReturnType())),
+        TRI_FUNCTION(TriFunction.class, sig -> append(sig.getArgumentTypes(), sig.getReturnType())),
+        QUAD_FUNCTION(QuadFunction.class, sig -> append(sig.getArgumentTypes(), sig.getReturnType())),
+        PENTA_FUNCTION(PentaFunction.class, sig -> append(sig.getArgumentTypes(), sig.getReturnType())),
+
+        // ToIntFunctions
+        TO_INT_FUNCTION(ToIntFunction.class, Type::getArgumentTypes),
+        TO_INT_BI_FUNCTION(ToIntBiFunction.class, Type::getArgumentTypes),
+        TO_INT_TRI_FUNCTION(ToIntTriFunction.class, Type::getArgumentTypes),
+        TO_INT_QUAD_FUNCTION(ToIntQuadFunction.class, Type::getArgumentTypes),
+
+        // ToLongFunctions
+        TO_LONG_FUNCTION(ToIntFunction.class, Type::getArgumentTypes),
+        TO_LONG_BI_FUNCTION(ToIntBiFunction.class, Type::getArgumentTypes),
+        TO_LONG_TRI_FUNCTION(ToIntTriFunction.class, Type::getArgumentTypes),
+        TO_LONG_QUAD_FUNCTION(ToIntQuadFunction.class, Type::getArgumentTypes);
+
+        final Class<?> interfaceClass;
+        final Function<Type, Type[]> methodGenericSignatureToClassGenericArgs;
+
+        FunctionalInterface(Class<?> interfaceClass,
+                Function<Type, Type[]> methodGenericSignatureToClassGenericArgs) {
+            this.interfaceClass = interfaceClass;
+            this.methodGenericSignatureToClassGenericArgs = methodGenericSignatureToClassGenericArgs;
+        }
+
+        private static Type[] append(Type[] elements, Type appended) {
+            Type[] out = Arrays.copyOf(elements, elements.length + 1);
+            out[elements.length] = appended;
+            return out;
+        }
+
+        public String getInterfaceSignature(Type methodGenericSignature) {
+            Type[] genericArguments = methodGenericSignatureToClassGenericArgs.apply(methodGenericSignature);
+            StringBuilder out = new StringBuilder();
+
+            out.append("L");
+            out.append(Type.getInternalName(interfaceClass));
+            out.append("<");
+
+            for (Type genericArgument : genericArguments) {
+                out.append(genericArgument.getDescriptor());
+            }
+
+            out.append(">;");
+            return out.toString();
+        }
+
+        public static String getInterfaceSignature(Type interfaceType, Type methodGenericSignature) {
+            for (FunctionalInterface functionalInterface : values()) {
+                if (Type.getType(functionalInterface.interfaceClass).equals(interfaceType)) {
+                    return functionalInterface.getInterfaceSignature(methodGenericSignature);
+                }
+            }
+            return null;
+        }
     }
 }

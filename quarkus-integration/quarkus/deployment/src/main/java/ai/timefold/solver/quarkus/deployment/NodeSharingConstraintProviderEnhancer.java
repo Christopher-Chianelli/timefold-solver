@@ -1,5 +1,7 @@
 package ai.timefold.solver.quarkus.deployment;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.lang.reflect.Modifier;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -21,52 +23,54 @@ public class NodeSharingConstraintProviderEnhancer {
 
     public void enhanceConstraintProvider(Class<? extends ConstraintProvider> constraintProviderClass,
             BuildProducer<BytecodeTransformerBuildItem> transformers) {
-        Map<String, String> methodNameToCanonicalMethod = new HashMap<>();
-        Map<String, LambdaSharingMethodVisitor.InvokeDynamicArgs> generatedFieldNameToInvokeDynamicArgs = new LinkedHashMap<>();
 
         // Need to use setInputTransformer to enforce that BytecodeRecordingClassVisitor
         // visitEnd is called before LambdaSharingClassVisitor begins visiting code
         transformers.produce(new BytecodeTransformerBuildItem.Builder()
                 .setClassToTransform(constraintProviderClass.getName())
-                .setInputTransformer(
-                        (name, inputBytes) -> {
-                            ClassWriter classWriter = new ClassWriter(Opcodes.ASM9);
-                            BytecodeRecordingClassVisitor classVisitor =
-                                    new BytecodeRecordingClassVisitor(classWriter, methodNameToCanonicalMethod);
-                            ClassReader classReader = new ClassReader(inputBytes);
-                            classReader.accept(classVisitor, Opcodes.ASM9);
-                            return classWriter.toByteArray();
-                        })
-                .setPriority(0)
+                .setInputTransformer(NodeSharingConstraintProviderEnhancer::shareLambdasInBytecode)
                 .build());
-        transformers.produce(new BytecodeTransformerBuildItem.Builder()
-                .setClassToTransform(constraintProviderClass.getName())
-                .setInputTransformer(
-                        (name, inputBytes) -> {
-                            ClassWriter classWriter = new ClassWriter(Opcodes.ASM9);
-                            LambdaSharingClassVisitor classVisitor =
-                                    new LambdaSharingClassVisitor(classWriter, name, methodNameToCanonicalMethod,
-                                            generatedFieldNameToInvokeDynamicArgs);
-                            ClassReader classReader = new ClassReader(inputBytes);
-                            classReader.accept(classVisitor, Opcodes.ASM9);
-                            return classWriter.toByteArray();
-                        })
-                .setPriority(1)
-                .build());
-        transformers.produce(new BytecodeTransformerBuildItem.Builder()
-                .setClassToTransform(constraintProviderClass.getName())
-                .setInputTransformer(
-                        (name, inputBytes) -> {
-                            ClassWriter classWriter = new ClassWriter(Opcodes.ASM9);
-                            CreateSharedLambdaFieldsClassVisitor classVisitor =
-                                    new CreateSharedLambdaFieldsClassVisitor(classWriter, name,
-                                            generatedFieldNameToInvokeDynamicArgs);
-                            ClassReader classReader = new ClassReader(inputBytes);
-                            classReader.accept(classVisitor, Opcodes.ASM9);
-                            return classWriter.toByteArray();
-                        })
-                .setPriority(2)
-                .build());
+    }
+
+    public static byte[] shareLambdasInClass(Class<?> clazz) throws IOException {
+        try (InputStream bytecodeInputStream = ClassLoader.getSystemResourceAsStream(
+                clazz.getName().replace('.', '/') + ".class")) {
+            if (bytecodeInputStream == null) {
+                throw new IllegalArgumentException("Could not locate bytecode for class (" + clazz + ").");
+            }
+            return shareLambdasInBytecode(clazz.getName(), bytecodeInputStream.readAllBytes());
+        }
+    }
+
+    public static byte[] shareLambdasInBytecode(String name, byte[] inputBytes) {
+        Map<String, String> methodNameToCanonicalMethod = new HashMap<>();
+        Map<String, LambdaSharingMethodVisitor.InvokeDynamicArgs> generatedFieldNameToInvokeDynamicArgs = new LinkedHashMap<>();
+
+        // First pass: record method bytecode
+        ClassWriter classWriter = new ClassWriter(Opcodes.ASM9);
+        ClassVisitor classVisitor =
+                new BytecodeRecordingClassVisitor(classWriter, methodNameToCanonicalMethod);
+        ClassReader classReader = new ClassReader(inputBytes);
+        classReader.accept(classVisitor, Opcodes.ASM9);
+
+        // Second pass: replace lambdas with static field reads
+        inputBytes = classWriter.toByteArray();
+        classWriter = new ClassWriter(Opcodes.ASM9);
+        classVisitor =
+                new LambdaSharingClassVisitor(classWriter, name, methodNameToCanonicalMethod,
+                        generatedFieldNameToInvokeDynamicArgs);
+        classReader = new ClassReader(inputBytes);
+        classReader.accept(classVisitor, Opcodes.ASM9);
+        inputBytes = classWriter.toByteArray();
+
+        // Final pass: initialize static fields with recorded invokedynamic
+        classWriter = new ClassWriter(Opcodes.ASM9);
+        classVisitor =
+                new CreateSharedLambdaFieldsClassVisitor(classWriter, name,
+                        generatedFieldNameToInvokeDynamicArgs);
+        classReader = new ClassReader(inputBytes);
+        classReader.accept(classVisitor, Opcodes.ASM9);
+        return classWriter.toByteArray();
     }
 
     private static class BytecodeRecordingClassVisitor extends ClassVisitor {
@@ -155,9 +159,10 @@ public class NodeSharingConstraintProviderEnhancer {
             for (Map.Entry<String, LambdaSharingMethodVisitor.InvokeDynamicArgs> generatedFieldAndInitializerEntry : generatedFieldNameToInvokeDynamicArgs
                     .entrySet()) {
                 String fieldName = generatedFieldAndInitializerEntry.getKey();
-                Type fieldDescriptor = generatedFieldAndInitializerEntry.getValue().getFieldDescriptor();
-                classVisitor.visitField(Modifier.PRIVATE | Modifier.STATIC,
-                        fieldName, fieldDescriptor.getDescriptor(), null, null);
+                var invokeDynamicArgs = generatedFieldAndInitializerEntry.getValue();
+                Type fieldDescriptor = invokeDynamicArgs.getFieldDescriptor();
+                classVisitor.visitField(Modifier.FINAL | Modifier.PRIVATE | Modifier.STATIC,
+                        fieldName, fieldDescriptor.getDescriptor(), invokeDynamicArgs.signature(), null);
             }
         }
 
