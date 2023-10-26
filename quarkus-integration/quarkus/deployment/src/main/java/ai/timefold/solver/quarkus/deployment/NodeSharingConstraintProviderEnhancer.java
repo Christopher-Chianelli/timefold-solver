@@ -1,10 +1,9 @@
 package ai.timefold.solver.quarkus.deployment;
 
 import java.lang.reflect.Modifier;
-import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.TreeMap;
 
 import ai.timefold.solver.core.api.score.stream.ConstraintProvider;
 
@@ -23,10 +22,8 @@ public class NodeSharingConstraintProviderEnhancer {
     public void enhanceConstraintProvider(Class<? extends ConstraintProvider> constraintProviderClass,
             BuildProducer<BytecodeTransformerBuildItem> transformers) {
         Map<String, String> methodNameToCanonicalMethod = new HashMap<>();
+        Map<String, LambdaSharingMethodVisitor.InvokeDynamicArgs> generatedFieldNameToInvokeDynamicArgs = new LinkedHashMap<>();
 
-        // Use a custom comparator to compare suffix int value, so 9 comes before 10
-        Map<String, LambdaSharingMethodVisitor.InvokeDynamicArgs> generatedFieldNameToInvokeDynamicArgs =
-                new TreeMap<>(Comparator.comparingInt(name -> Integer.parseInt(name.substring(name.lastIndexOf('$') + 1))));
         // Need to use setInputTransformer to enforce that BytecodeRecordingClassVisitor
         // visitEnd is called before LambdaSharingClassVisitor begins visiting code
         transformers.produce(new BytecodeTransformerBuildItem.Builder()
