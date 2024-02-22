@@ -1,6 +1,7 @@
 package ai.timefold.solver.core.enterprise;
 
 import java.lang.reflect.InvocationTargetException;
+import java.util.List;
 import java.util.function.BiFunction;
 
 import ai.timefold.solver.core.api.score.stream.ConstraintProvider;
@@ -74,7 +75,8 @@ public interface TimefoldSolverEnterpriseService {
             EnvironmentMode environmentMode, HeuristicConfigPolicy<Solution_> configPolicy);
 
     <Solution_> LocalSearchDecider<Solution_> buildLocalSearch(int moveThreadCount, Termination<Solution_> termination,
-            MoveSelector<Solution_> moveSelector, Acceptor<Solution_> acceptor, LocalSearchForager<Solution_> forager,
+            List<MoveSelector<Solution_>> moveSelectorList, Acceptor<Solution_> acceptor,
+            LocalSearchForager<Solution_> forager,
             EnvironmentMode environmentMode, HeuristicConfigPolicy<Solution_> configPolicy);
 
     <Solution_> PartitionedSearchPhase<Solution_> buildPartitionedSearch(int phaseIndex,
