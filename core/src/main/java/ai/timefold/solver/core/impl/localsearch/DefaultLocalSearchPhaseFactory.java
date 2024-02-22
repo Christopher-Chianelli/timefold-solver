@@ -1,6 +1,8 @@
 package ai.timefold.solver.core.impl.localsearch;
 
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.Objects;
 
 import ai.timefold.solver.core.config.heuristic.selector.common.SelectionCacheType;
@@ -80,8 +82,13 @@ public class DefaultLocalSearchPhaseFactory<Solution_> extends AbstractPhaseFact
         if (moveThreadCount == null) {
             decider = new LocalSearchDecider<>(configPolicy.getLogIndentation(), termination, moveSelector, acceptor, forager);
         } else {
+            List<MoveSelector<Solution_>> moveSelectorList = new ArrayList<>(moveThreadCount);
+            moveSelectorList.add(moveSelector);
+            for (int i = 1; i < moveThreadCount; i++) {
+                moveSelectorList.add(buildMoveSelector(configPolicy));
+            }
             decider = TimefoldSolverEnterpriseService.loadOrFail(TimefoldSolverEnterpriseService.Feature.MULTITHREADED_SOLVING)
-                    .buildLocalSearch(moveThreadCount, termination, moveSelector, acceptor, forager, environmentMode,
+                    .buildLocalSearch(moveThreadCount, termination, moveSelectorList, acceptor, forager, environmentMode,
                             configPolicy);
         }
         if (environmentMode.isNonIntrusiveFullAsserted()) {
