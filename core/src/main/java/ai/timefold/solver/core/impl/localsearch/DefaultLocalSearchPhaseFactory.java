@@ -85,7 +85,8 @@ public class DefaultLocalSearchPhaseFactory<Solution_> extends AbstractPhaseFact
             List<MoveSelector<Solution_>> moveSelectorList = new ArrayList<>(moveThreadCount);
             moveSelectorList.add(moveSelector);
             for (int i = 1; i < moveThreadCount; i++) {
-                moveSelectorList.add(buildMoveSelector(configPolicy));
+                // Use a clone so new selector maps will be used
+                moveSelectorList.add(buildMoveSelector(configPolicy.cloneBuilder().build()));
             }
             decider = TimefoldSolverEnterpriseService.loadOrFail(TimefoldSolverEnterpriseService.Feature.MULTITHREADED_SOLVING)
                     .buildLocalSearch(moveThreadCount, termination, moveSelectorList, acceptor, forager, environmentMode,
