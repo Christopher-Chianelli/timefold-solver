@@ -7,6 +7,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
+import ai.timefold.solver.core.api.domain.solution.ConstraintWeightOverrides;
 import ai.timefold.solver.core.api.score.Score;
 
 /**
@@ -16,7 +17,10 @@ import ai.timefold.solver.core.api.score.Score;
  * will result in a {@link Score} of {@code -6soft}.
  * <p>
  * It is specified on a getter of a java bean property (or directly on a field) of a {@link ConstraintConfiguration} class.
+ *
+ * @deprecated Use {@link ConstraintWeightOverrides} instead.
  */
+@Deprecated(forRemoval = true, since = "1.13.0")
 @Target({ FIELD, METHOD })
 @Retention(RUNTIME)
 public @interface ConstraintWeight {

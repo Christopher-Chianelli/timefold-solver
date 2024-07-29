@@ -9,7 +9,6 @@ import java.util.function.Predicate;
 import ai.timefold.solver.core.api.score.stream.Joiners;
 import ai.timefold.solver.core.api.score.stream.uni.UniConstraintStream;
 import ai.timefold.solver.core.config.solver.EnvironmentMode;
-import ai.timefold.solver.core.impl.domain.constraintweight.descriptor.ConstraintConfigurationDescriptor;
 import ai.timefold.solver.core.impl.domain.solution.descriptor.SolutionDescriptor;
 import ai.timefold.solver.core.impl.score.stream.bavet.common.BavetAbstractConstraintStream;
 import ai.timefold.solver.core.impl.score.stream.bavet.uni.BavetAbstractUniConstraintStream;
@@ -19,6 +18,18 @@ import ai.timefold.solver.core.impl.score.stream.common.RetrievalSemantics;
 
 public final class BavetConstraintFactory<Solution_>
         extends InnerConstraintFactory<Solution_, BavetConstraint<Solution_>> {
+
+    /**
+     * Used for code in no package, also called the "unnamed package".
+     * Classes here can only be instantiated via reflection,
+     * they cannot be imported and used directly.
+     * But still, in corner cases such as Kotlin notebooks,
+     * all code is in the unnamed package.
+     * Assume a constraint provider under these conditions,
+     * where asConstraint(...) only specifies constraint name, not constraint package.
+     * In this situation, the default constraint package is used.
+     */
+    private static final String DEFAULT_CONSTRAINT_PACKAGE = "unnamed.package";
 
     private final SolutionDescriptor<Solution_> solutionDescriptor;
     private final EnvironmentMode environmentMode;
@@ -30,14 +41,21 @@ public final class BavetConstraintFactory<Solution_>
     public BavetConstraintFactory(SolutionDescriptor<Solution_> solutionDescriptor, EnvironmentMode environmentMode) {
         this.solutionDescriptor = solutionDescriptor;
         this.environmentMode = Objects.requireNonNull(environmentMode);
-        ConstraintConfigurationDescriptor<Solution_> configurationDescriptor = solutionDescriptor
-                .getConstraintConfigurationDescriptor();
-        if (configurationDescriptor == null) {
-            Package pack = solutionDescriptor.getSolutionClass().getPackage();
-            defaultConstraintPackage = (pack == null) ? "" : pack.getName();
+        var weightSupplier = solutionDescriptor.getConstraintWeightSupplier();
+        if (weightSupplier == null) {
+            defaultConstraintPackage = determineDefaultConstraintPackage(solutionDescriptor.getSolutionClass().getPackage());
         } else {
-            defaultConstraintPackage = configurationDescriptor.getConstraintPackage();
+            defaultConstraintPackage = determineDefaultConstraintPackage(weightSupplier.getDefaultConstraintPackage());
         }
+    }
+
+    private static String determineDefaultConstraintPackage(Package pkg) {
+        var asString = pkg == null ? "" : pkg.getName();
+        return determineDefaultConstraintPackage(asString);
+    }
+
+    private static String determineDefaultConstraintPackage(String constraintPackage) {
+        return constraintPackage == null || constraintPackage.isEmpty() ? DEFAULT_CONSTRAINT_PACKAGE : constraintPackage;
     }
 
     public <Stream_ extends BavetAbstractConstraintStream<Solution_>> Stream_ share(Stream_ stream) {

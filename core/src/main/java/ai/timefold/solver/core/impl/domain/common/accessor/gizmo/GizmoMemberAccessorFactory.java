@@ -25,8 +25,15 @@ public class GizmoMemberAccessorFactory {
         return member.getDeclaringClass().getName() + "$Timefold$MemberAccessor$" + memberType + "$" + memberName;
     }
 
+    /**
+     *
+     * @param member never null
+     * @param annotationClass may be null if the member is not annotated
+     * @param gizmoClassLoader never null
+     * @return never null
+     */
     public static MemberAccessor buildGizmoMemberAccessor(Member member, Class<? extends Annotation> annotationClass,
-            GizmoClassLoader gizmoClassLoader) {
+            boolean returnTypeRequired, GizmoClassLoader gizmoClassLoader) {
         try {
             // Check if Gizmo on the classpath by verifying we can access one of its classes
             Class.forName("io.quarkus.gizmo.ClassCreator", false,
@@ -37,7 +44,7 @@ public class GizmoMemberAccessorFactory {
                     ") the classpath or modulepath must contain io.quarkus.gizmo:gizmo.\n" +
                     "Maybe add a dependency to io.quarkus.gizmo:gizmo.");
         }
-        return GizmoMemberAccessorImplementor.createAccessorFor(member, annotationClass, gizmoClassLoader);
+        return GizmoMemberAccessorImplementor.createAccessorFor(member, annotationClass, returnTypeRequired, gizmoClassLoader);
     }
 
     private GizmoMemberAccessorFactory() {
