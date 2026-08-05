@@ -353,15 +353,15 @@ final class BavetRegressionTest extends AbstractConstraintStreamTest {
                         factory -> new Constraint[] {
                                 factory.forEach(TestdataAllowsUnassignedValuesListValue.class)
                                         .join(factory.forEach(TestdataAllowsUnassignedValuesListValue.class)
-                                                        .map(v -> v),
+                                                .map(v -> v),
                                                 equal(TestdataAllowsUnassignedValuesListValue::getEntity,
                                                         TestdataAllowsUnassignedValuesListValue::getEntity))
                                         .join(factory.forEach(TestdataAllowsUnassignedValuesListValue.class)
-                                                        .map(v -> v),
+                                                .map(v -> v),
                                                 equal((a, b) -> a.getEntity(),
                                                         TestdataAllowsUnassignedValuesListValue::getEntity))
                                         .join(factory.forEach(TestdataAllowsUnassignedValuesListValue.class)
-                                                        .map(v -> v),
+                                                .map(v -> v),
                                                 equal((a, b, c) -> a.getEntity(),
                                                         TestdataAllowsUnassignedValuesListValue::getEntity),
                                                 filtering((a, b, c, d) -> {
@@ -557,15 +557,15 @@ final class BavetRegressionTest extends AbstractConstraintStreamTest {
                         factory -> new Constraint[] {
                                 factory.forEach(TestdataAllowsUnassignedValuesListValue.class)
                                         .join(factory.forEach(TestdataAllowsUnassignedValuesListValue.class)
-                                                        .map(v -> v),
+                                                .map(v -> v),
                                                 equal(TestdataAllowsUnassignedValuesListValue::getEntity,
                                                         TestdataAllowsUnassignedValuesListValue::getEntity))
                                         .join(factory.forEach(TestdataAllowsUnassignedValuesListValue.class)
-                                                        .map(v -> v),
+                                                .map(v -> v),
                                                 equal((a, b) -> a.getEntity(),
                                                         TestdataAllowsUnassignedValuesListValue::getEntity))
                                         .join(factory.forEach(TestdataAllowsUnassignedValuesListValue.class)
-                                                        .map(v -> v),
+                                                .map(v -> v),
                                                 equal((a, b, c) -> a.getEntity(),
                                                         TestdataAllowsUnassignedValuesListValue::getEntity))
                                         .ifExists(TestdataAllowsUnassignedValuesListValue.class,
@@ -1109,12 +1109,12 @@ final class BavetRegressionTest extends AbstractConstraintStreamTest {
                         factory -> new Constraint[] {
                                 factory.forEach(TestdataAllowsUnassignedValuesListValue.class)
                                         .join(factory.forEach(TestdataAllowsUnassignedValuesListValue.class)
-                                                        .map(v -> v),
+                                                .map(v -> v),
                                                 equal(Function.identity(), Function.identity()))
                                         .map((TestdataAllowsUnassignedValuesListValue a,
                                                 TestdataAllowsUnassignedValuesListValue b) -> a)
                                         .join(factory.forEach(TestdataAllowsUnassignedValuesListValue.class)
-                                                        .map(v -> v),
+                                                .map(v -> v),
                                                 equal(TestdataAllowsUnassignedValuesListValue::getEntity,
                                                         TestdataAllowsUnassignedValuesListValue::getEntity),
                                                 filtering((a, b) -> {
@@ -1172,12 +1172,12 @@ final class BavetRegressionTest extends AbstractConstraintStreamTest {
                         factory -> new Constraint[] {
                                 factory.forEach(TestdataAllowsUnassignedValuesListValue.class)
                                         .join(factory.forEach(TestdataAllowsUnassignedValuesListValue.class)
-                                                        .map(v -> v),
+                                                .map(v -> v),
                                                 equal(Function.identity(), Function.identity()))
                                         .flatten((TestdataAllowsUnassignedValuesListValue a,
                                                 TestdataAllowsUnassignedValuesListValue b) -> List.of(a))
                                         .join(factory.forEach(TestdataAllowsUnassignedValuesListValue.class)
-                                                        .map(v -> v),
+                                                .map(v -> v),
                                                 equal((x, y, z) -> z.getEntity(),
                                                         TestdataAllowsUnassignedValuesListValue::getEntity),
                                                 filtering((x, y, z, w) -> {
@@ -1238,12 +1238,12 @@ final class BavetRegressionTest extends AbstractConstraintStreamTest {
                         factory -> new Constraint[] {
                                 factory.forEach(TestdataAllowsUnassignedValuesListValue.class)
                                         .join(factory.forEach(TestdataAllowsUnassignedValuesListValue.class)
-                                                        .map(v -> v),
+                                                .map(v -> v),
                                                 equal(Function.identity(), Function.identity()))
                                         .groupBy((TestdataAllowsUnassignedValuesListValue a,
                                                 TestdataAllowsUnassignedValuesListValue b) -> a)
                                         .join(factory.forEach(TestdataAllowsUnassignedValuesListValue.class)
-                                                        .map(v -> v),
+                                                .map(v -> v),
                                                 equal(TestdataAllowsUnassignedValuesListValue::getEntity,
                                                         TestdataAllowsUnassignedValuesListValue::getEntity),
                                                 filtering((a, b) -> {
@@ -1301,12 +1301,12 @@ final class BavetRegressionTest extends AbstractConstraintStreamTest {
                         factory -> new Constraint[] {
                                 factory.forEach(TestdataAllowsUnassignedValuesListValue.class)
                                         .join(factory.forEach(TestdataAllowsUnassignedValuesListValue.class)
-                                                        .map(v -> v),
+                                                .map(v -> v),
                                                 equal(Function.identity(), Function.identity()))
                                         .groupBy((TestdataAllowsUnassignedValuesListValue a,
                                                 TestdataAllowsUnassignedValuesListValue b) -> a.getEntity())
                                         .join(factory.forEach(TestdataAllowsUnassignedValuesListValue.class)
-                                                        .map(v -> v),
+                                                .map(v -> v),
                                                 equal(Function.identity(),
                                                         TestdataAllowsUnassignedValuesListValue::getEntity),
                                                 filtering((groupEntity, value) -> {
@@ -1369,12 +1369,12 @@ final class BavetRegressionTest extends AbstractConstraintStreamTest {
                         factory -> new Constraint[] {
                                 factory.forEach(TestdataAllowsUnassignedValuesListValue.class)
                                         .join(factory.forEach(TestdataAllowsUnassignedValuesListValue.class)
-                                                        .map(v -> v),
+                                                .map(v -> v),
                                                 equal(Function.identity(), Function.identity()))
                                         .groupBy((TestdataAllowsUnassignedValuesListValue a,
                                                 TestdataAllowsUnassignedValuesListValue b) -> a.getEntity())
                                         .join(factory.forEach(TestdataAllowsUnassignedValuesListValue.class)
-                                                        .map(v -> v),
+                                                .map(v -> v),
                                                 equal(Function.identity(),
                                                         TestdataAllowsUnassignedValuesListValue::getEntity),
                                                 filtering((groupEntity, value) -> {

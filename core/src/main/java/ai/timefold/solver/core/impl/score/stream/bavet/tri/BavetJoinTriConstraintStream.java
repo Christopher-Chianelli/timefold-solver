@@ -5,6 +5,7 @@ import java.util.Set;
 
 import ai.timefold.solver.core.api.function.TriPredicate;
 import ai.timefold.solver.core.api.score.Score;
+import ai.timefold.solver.core.impl.bavet.common.AbstractNode;
 import ai.timefold.solver.core.impl.bavet.common.BavetAbstractConstraintStream;
 import ai.timefold.solver.core.impl.bavet.common.index.IndexerFactory;
 import ai.timefold.solver.core.impl.bavet.common.tuple.TriTuple;
@@ -61,9 +62,17 @@ public final class BavetJoinTriConstraintStream<Solution_, A, B, C>
         IndexerFactory<C> indexerFactory = new IndexerFactory<>(joiner);
         var positionTracker =
                 buildHelper.getTupleStorePositionTracker(this, leftParent.getTupleSource(), rightParent.getTupleSource());
-        var node = indexerFactory.hasJoiners()
-                ? new IndexedJoinTriNode<>(indexerFactory, downstream, filtering, positionTracker)
-                : new UnindexedJoinTriNode<>(downstream, filtering, positionTracker);
+        AbstractNode node;
+        if (filtering != null) {
+            var newDownstream = TupleLifecycle.conditionally(downstream, filtering);
+            node = indexerFactory.hasJoiners()
+                    ? new IndexedJoinTriNode<>(indexerFactory, newDownstream, null, positionTracker)
+                    : new UnindexedJoinTriNode<>(newDownstream, null, positionTracker);
+        } else {
+            node = indexerFactory.hasJoiners()
+                    ? new IndexedJoinTriNode<>(indexerFactory, downstream, null, positionTracker)
+                    : new UnindexedJoinTriNode<>(downstream, null, positionTracker);
+        }
         buildHelper.addNode(node, this, leftParent, rightParent);
     }
 

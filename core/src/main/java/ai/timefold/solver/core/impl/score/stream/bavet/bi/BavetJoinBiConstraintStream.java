@@ -8,6 +8,7 @@ import ai.timefold.solver.core.api.score.Score;
 import ai.timefold.solver.core.impl.bavet.bi.IndexedJoinBiNode;
 import ai.timefold.solver.core.impl.bavet.bi.UnindexedJoinBiNode;
 import ai.timefold.solver.core.impl.bavet.bi.joiner.DefaultBiJoiner;
+import ai.timefold.solver.core.impl.bavet.common.AbstractNode;
 import ai.timefold.solver.core.impl.bavet.common.BavetAbstractConstraintStream;
 import ai.timefold.solver.core.impl.bavet.common.index.IndexerFactory;
 import ai.timefold.solver.core.impl.bavet.common.tuple.BiTuple;
@@ -58,9 +59,18 @@ public final class BavetJoinBiConstraintStream<Solution_, A, B> extends BavetAbs
         IndexerFactory<B> indexerFactory = new IndexerFactory<>(joiner);
         var positionTracker =
                 buildHelper.getTupleStorePositionTracker(this, leftParent.getTupleSource(), rightParent.getTupleSource());
-        var node = indexerFactory.hasJoiners()
-                ? new IndexedJoinBiNode<>(indexerFactory, downstream, filtering, positionTracker)
-                : new UnindexedJoinBiNode<>(downstream, filtering, positionTracker);
+
+        AbstractNode node;
+        if (filtering != null) {
+            var newDownstream = TupleLifecycle.conditionally(downstream, filtering);
+            node = indexerFactory.hasJoiners()
+                    ? new IndexedJoinBiNode<>(indexerFactory, newDownstream, null, positionTracker)
+                    : new UnindexedJoinBiNode<>(newDownstream, null, positionTracker);
+        } else {
+            node = indexerFactory.hasJoiners()
+                    ? new IndexedJoinBiNode<>(indexerFactory, downstream, null, positionTracker)
+                    : new UnindexedJoinBiNode<>(downstream, null, positionTracker);
+        }
         buildHelper.addNode(node, this, leftParent, rightParent);
     }
 

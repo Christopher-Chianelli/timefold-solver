@@ -7,6 +7,7 @@ import java.util.Objects;
 import java.util.function.BiPredicate;
 import java.util.function.Predicate;
 
+import ai.timefold.solver.core.api.function.PentaPredicate;
 import ai.timefold.solver.core.api.function.QuadPredicate;
 import ai.timefold.solver.core.api.function.TriPredicate;
 import ai.timefold.solver.core.impl.bavet.common.AbstractNode;
@@ -59,6 +60,37 @@ public interface TupleLifecycle<Tuple_ extends Tuple>
             conditionally(TupleLifecycle<QuadTuple<A, B, C, D>> tupleLifecycle, QuadPredicate<A, B, C, D> predicate) {
         return new ConditionalTupleLifecycle<>(tupleLifecycle,
                 tuple -> predicate.test(tuple.getA(), tuple.getB(), tuple.getC(), tuple.getD()));
+    }
+
+    static <A, B> ConditionalAnyMatchTupleLifecycle<UniTuple<A>, B> conditionallyAny(TupleLifecycle<UniTuple<A>> tupleLifecycle,
+            boolean shouldExists, BiPredicate<A, B> predicate) {
+        return new ConditionalAnyMatchTupleLifecycle<>(tupleLifecycle,
+                (tuple, right) -> predicate.test(tuple.getA(), right),
+                shouldExists);
+    }
+
+    static <A, B, C> ConditionalAnyMatchTupleLifecycle<BiTuple<A, B>, C> conditionallyAny(
+            TupleLifecycle<BiTuple<A, B>> tupleLifecycle,
+            boolean shouldExists, TriPredicate<A, B, C> predicate) {
+        return new ConditionalAnyMatchTupleLifecycle<>(tupleLifecycle,
+                (tuple, right) -> predicate.test(tuple.getA(), tuple.getB(), right),
+                shouldExists);
+    }
+
+    static <A, B, C, D> ConditionalAnyMatchTupleLifecycle<TriTuple<A, B, C>, D> conditionallyAny(
+            TupleLifecycle<TriTuple<A, B, C>> tupleLifecycle,
+            boolean shouldExists, QuadPredicate<A, B, C, D> predicate) {
+        return new ConditionalAnyMatchTupleLifecycle<>(tupleLifecycle,
+                (tuple, right) -> predicate.test(tuple.getA(), tuple.getB(), tuple.getC(), right),
+                shouldExists);
+    }
+
+    static <A, B, C, D, E> ConditionalAnyMatchTupleLifecycle<QuadTuple<A, B, C, D>, E>
+            conditionallyAny(TupleLifecycle<QuadTuple<A, B, C, D>> tupleLifecycle,
+                    boolean shouldExists, PentaPredicate<A, B, C, D, E> predicate) {
+        return new ConditionalAnyMatchTupleLifecycle<>(tupleLifecycle,
+                (tuple, right) -> predicate.test(tuple.getA(), tuple.getB(), tuple.getC(), tuple.getD(), right),
+                shouldExists);
     }
 
     static <Tuple_ extends Tuple> TupleLifecycle<Tuple_> recording() {

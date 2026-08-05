@@ -6,6 +6,7 @@ import java.util.function.BiPredicate;
 
 import ai.timefold.solver.core.api.score.Score;
 import ai.timefold.solver.core.impl.bavet.bi.joiner.DefaultBiJoiner;
+import ai.timefold.solver.core.impl.bavet.common.AbstractIfExistsNode;
 import ai.timefold.solver.core.impl.bavet.common.BavetAbstractConstraintStream;
 import ai.timefold.solver.core.impl.bavet.common.index.IndexerFactory;
 import ai.timefold.solver.core.impl.bavet.common.tuple.TupleLifecycle;
@@ -66,11 +67,26 @@ final class BavetIfExistsUniConstraintStream<Solution_, A, B>
         IndexerFactory<B> indexerFactory = new IndexerFactory<>(joiner);
         var positionTracker =
                 buildHelper.getTupleStorePositionTracker(this, parentA.getTupleSource(), parentBridgeB.getTupleSource());
-        var node = indexerFactory.hasJoiners()
-                ? (filtering == null ? new IndexedIfExistsUniNode<>(shouldExist, indexerFactory, downstream, positionTracker)
-                        : new IndexedIfExistsUniNode<>(shouldExist, indexerFactory, downstream, filtering, positionTracker))
-                : (filtering == null ? new UnindexedIfExistsUniNode<>(shouldExist, downstream, positionTracker)
-                        : new UnindexedIfExistsUniNode<>(shouldExist, downstream, filtering, positionTracker));
+
+        AbstractIfExistsNode<UniTuple<A>, B> node;
+        if (filtering != null) {
+            var newDownstream = TupleLifecycle.conditionallyAny(downstream, shouldExist, filtering);
+            node = indexerFactory.hasJoiners()
+                    ? (filtering == null
+                            ? new IndexedIfExistsUniNode<>(shouldExist, indexerFactory, newDownstream, positionTracker)
+                            : new IndexedIfExistsUniNode<>(shouldExist, indexerFactory, newDownstream, filtering,
+                                    positionTracker))
+                    : (filtering == null ? new UnindexedIfExistsUniNode<>(shouldExist, newDownstream, positionTracker)
+                            : new UnindexedIfExistsUniNode<>(shouldExist, newDownstream, filtering, positionTracker));
+            newDownstream.setParent(node);
+        } else {
+            node = indexerFactory.hasJoiners()
+                    ? (filtering == null
+                            ? new IndexedIfExistsUniNode<>(shouldExist, indexerFactory, downstream, positionTracker)
+                            : new IndexedIfExistsUniNode<>(shouldExist, indexerFactory, downstream, filtering, positionTracker))
+                    : (filtering == null ? new UnindexedIfExistsUniNode<>(shouldExist, downstream, positionTracker)
+                            : new UnindexedIfExistsUniNode<>(shouldExist, downstream, filtering, positionTracker));
+        }
         buildHelper.addNode(node, this, this, parentBridgeB);
     }
 

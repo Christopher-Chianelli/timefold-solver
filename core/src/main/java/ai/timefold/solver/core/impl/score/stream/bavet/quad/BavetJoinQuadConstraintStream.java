@@ -5,6 +5,7 @@ import java.util.Set;
 
 import ai.timefold.solver.core.api.function.QuadPredicate;
 import ai.timefold.solver.core.api.score.Score;
+import ai.timefold.solver.core.impl.bavet.common.AbstractNode;
 import ai.timefold.solver.core.impl.bavet.common.BavetAbstractConstraintStream;
 import ai.timefold.solver.core.impl.bavet.common.index.IndexerFactory;
 import ai.timefold.solver.core.impl.bavet.common.tuple.QuadTuple;
@@ -61,9 +62,17 @@ public final class BavetJoinQuadConstraintStream<Solution_, A, B, C, D>
         IndexerFactory<D> indexerFactory = new IndexerFactory<>(joiner);
         var positionTracker =
                 buildHelper.getTupleStorePositionTracker(this, leftParent.getTupleSource(), rightParent.getTupleSource());
-        var node = indexerFactory.hasJoiners()
-                ? new IndexedJoinQuadNode<>(indexerFactory, downstream, filtering, positionTracker)
-                : new UnindexedJoinQuadNode<>(downstream, filtering, positionTracker);
+        AbstractNode node;
+        if (filtering != null) {
+            var newDownstream = TupleLifecycle.conditionally(downstream, filtering);
+            node = indexerFactory.hasJoiners()
+                    ? new IndexedJoinQuadNode<>(indexerFactory, newDownstream, null, positionTracker)
+                    : new UnindexedJoinQuadNode<>(newDownstream, null, positionTracker);
+        } else {
+            node = indexerFactory.hasJoiners()
+                    ? new IndexedJoinQuadNode<>(indexerFactory, downstream, null, positionTracker)
+                    : new UnindexedJoinQuadNode<>(downstream, null, positionTracker);
+        }
         buildHelper.addNode(node, this, leftParent, rightParent);
     }
 
