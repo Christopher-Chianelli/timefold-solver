@@ -1,7 +1,5 @@
 package ai.timefold.solver.core.impl.bavet.common;
 
-import java.util.Iterator;
-
 import ai.timefold.solver.core.impl.bavet.common.tuple.InTupleStorePositionTracker;
 import ai.timefold.solver.core.impl.bavet.common.tuple.Tuple;
 import ai.timefold.solver.core.impl.bavet.common.tuple.TupleLifecycle;
@@ -47,10 +45,6 @@ public abstract class AbstractIfExistsNode<LeftTuple_ extends Tuple, Right_>
     @Override
     public StreamKind getStreamKind() {
         return StreamKind.IF_EXISTS;
-    }
-
-    public int getInputStoreIndexLeftTrackerList() {
-        return inputStoreIndexLeftTrackerList;
     }
 
     protected abstract boolean testFiltering(LeftTuple_ leftTuple, UniTuple<Right_> rightTuple);
@@ -139,7 +133,7 @@ public abstract class AbstractIfExistsNode<LeftTuple_ extends Tuple, Right_>
         if (!isFiltering) {
             return;
         }
-        FilteringTracker<LeftTuple_, Right_> tracker = leftTuple.removeStore(inputStoreIndexLeftTrackerList);
+        FilteringTracker<LeftTuple_> tracker = leftTuple.removeStore(inputStoreIndexLeftTrackerList);
         while (tracker != null) {
             var next = tracker.leftNext;
             removeRight(tracker);
@@ -149,7 +143,7 @@ public abstract class AbstractIfExistsNode<LeftTuple_ extends Tuple, Right_>
 
     // Splices tracker out of its right tuple's hidden list (used when clearing from the left side).
     // Nulls the tracker's right links; if tracker is the head, updates the right tuple's slot.
-    private void removeRight(FilteringTracker<LeftTuple_, Right_> tracker) {
+    private void removeRight(FilteringTracker<LeftTuple_> tracker) {
         var prev = tracker.rightPrev;
         var next = tracker.rightNext;
         if (prev != null) {
@@ -169,7 +163,7 @@ public abstract class AbstractIfExistsNode<LeftTuple_ extends Tuple, Right_>
     // decrementing each counter and cross-removing each tracker from its left tuple's hidden list.
     // Walk safety: removeFromLeft only touches left-side links, so rightNext is stable across the call.
     protected void clearRightTrackerList(UniTuple<Right_> rightTuple) {
-        FilteringTracker<LeftTuple_, Right_> tracker = rightTuple.removeStore(inputStoreIndexRightTrackerList);
+        FilteringTracker<LeftTuple_> tracker = rightTuple.removeStore(inputStoreIndexRightTrackerList);
         while (tracker != null) {
             var next = tracker.rightNext;
             decrementCounterRight(tracker.counter);
@@ -180,7 +174,7 @@ public abstract class AbstractIfExistsNode<LeftTuple_ extends Tuple, Right_>
 
     // Splices tracker out of its left tuple's hidden list (used when clearing from the right side).
     // Nulls the tracker's left links; if tracker is the head, updates the left tuple's slot.
-    private void removeLeft(FilteringTracker<LeftTuple_, Right_> tracker) {
+    private void removeLeft(FilteringTracker<LeftTuple_> tracker) {
         var prev = tracker.leftPrev;
         var next = tracker.leftNext;
         if (prev != null) {
@@ -204,10 +198,6 @@ public abstract class AbstractIfExistsNode<LeftTuple_ extends Tuple, Right_>
             // Skipping is safe, as the pending retract will not have a tracker to clear for this pair.
             return;
         }
-
-        // TODO: Remove this call to testFiltering; the ConditionalAnyMatchTupleLifecycle
-        //       should handle it and update the tracker. Instead, mark ALL associated rightTuples
-        //       as updated (need to rerun the filter on everything if left updated).
         if (testFiltering(counter.leftTuple, rightTuple)) {
             counter.countRight++;
             var tracker = new FilteringTracker<>(counter, rightTuple);
@@ -218,9 +208,9 @@ public abstract class AbstractIfExistsNode<LeftTuple_ extends Tuple, Right_>
 
     // Prepends tracker into the left tuple's hidden intrusive tracker list.
     // The left tuple's store at inputStoreIndexLeftTrackerList holds the list head (null = empty).
-    private void linkLeft(FilteringTracker<LeftTuple_, Right_> tracker) {
+    private void linkLeft(FilteringTracker<LeftTuple_> tracker) {
         var leftTuple = tracker.counter.leftTuple;
-        FilteringTracker<LeftTuple_, Right_> head = leftTuple.getStore(inputStoreIndexLeftTrackerList);
+        FilteringTracker<LeftTuple_> head = leftTuple.getStore(inputStoreIndexLeftTrackerList);
         tracker.leftNext = head;
         if (head != null) {
             head.leftPrev = tracker;
@@ -230,9 +220,9 @@ public abstract class AbstractIfExistsNode<LeftTuple_ extends Tuple, Right_>
 
     // Prepends tracker into the right tuple's hidden intrusive tracker list.
     // The right tuple's store at inputStoreIndexRightTrackerList holds the list head (null = empty).
-    private void linkRight(FilteringTracker<LeftTuple_, Right_> tracker) {
+    private void linkRight(FilteringTracker<LeftTuple_> tracker) {
         var rightTuple = tracker.rightTuple;
-        FilteringTracker<LeftTuple_, Right_> head = rightTuple.getStore(inputStoreIndexRightTrackerList);
+        FilteringTracker<LeftTuple_> head = rightTuple.getStore(inputStoreIndexRightTrackerList);
         tracker.rightNext = head;
         if (head != null) {
             head.rightPrev = tracker;
@@ -259,10 +249,6 @@ public abstract class AbstractIfExistsNode<LeftTuple_ extends Tuple, Right_>
             // The mirror case is possible too, see updateCounterLeft(...).
             return;
         }
-
-        // TODO: Remove this call to testFiltering; the ConditionalAnyMatchTupleLifecycle
-        //       should handle it and update the tracker. Instead, mark rightTuple
-        //       as updated.
         if (testFiltering(leftTuple, rightTuple)) {
             incrementCounterRight(counter);
             var tracker = new FilteringTracker<>(counter, rightTuple);
@@ -316,7 +302,7 @@ public abstract class AbstractIfExistsNode<LeftTuple_ extends Tuple, Right_>
     }
 
     @NullMarked
-    public static final class FilteringTracker<LeftTuple_ extends Tuple, Right_> implements Iterable<Right_> {
+    protected static final class FilteringTracker<LeftTuple_ extends Tuple> {
 
         // A tracker is a node in TWO hidden intrusive doubly-linked lists at once:
         // one keyed on its left tuple (counter.leftTuple) and one on its right tuple.
@@ -324,38 +310,17 @@ public abstract class AbstractIfExistsNode<LeftTuple_ extends Tuple, Right_>
         // inputStoreIndexRightTrackerList store slots (null = empty list).
         // These fields ARE the links — no ElementAwareLinkedList or Entry is allocated.
         final ExistsCounter<LeftTuple_> counter; // -> leftTuple, for the left-keyed list and counter decrement
-        final UniTuple<Right_> rightTuple; // for the right-keyed list; typed as Tuple (not UniTuple<Right_>) — only getStore/setStore needed
+        final Tuple rightTuple; // for the right-keyed list; typed as Tuple (not UniTuple<Right_>) — only getStore/setStore needed
         @Nullable
-        FilteringTracker<LeftTuple_, Right_> leftPrev, leftNext; // links in the left tuple's hidden list
+        FilteringTracker<LeftTuple_> leftPrev, leftNext; // links in the left tuple's hidden list
         @Nullable
-        FilteringTracker<LeftTuple_, Right_> rightPrev, rightNext; // links in the right tuple's hidden list
+        FilteringTracker<LeftTuple_> rightPrev, rightNext; // links in the right tuple's hidden list
 
-        FilteringTracker(ExistsCounter<LeftTuple_> counter, UniTuple<Right_> rightTuple) {
+        FilteringTracker(ExistsCounter<LeftTuple_> counter, Tuple rightTuple) {
             this.counter = counter;
             this.rightTuple = rightTuple;
         }
 
-        @Override
-        public Iterator<Right_> iterator() {
-            var head = this;
-            return new Iterator<>() {
-                @Nullable
-                FilteringTracker<?, Right_> current = head;
-
-                @Override
-                public boolean hasNext() {
-                    return current != null;
-                }
-
-                @Override
-                @Nullable
-                public Right_ next() {
-                    var out = current.rightTuple.getA();
-                    current = current.leftNext;
-                    return out;
-                }
-            };
-        }
     }
 
 }

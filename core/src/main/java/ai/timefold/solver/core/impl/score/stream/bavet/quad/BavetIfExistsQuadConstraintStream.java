@@ -5,7 +5,6 @@ import java.util.Set;
 
 import ai.timefold.solver.core.api.function.PentaPredicate;
 import ai.timefold.solver.core.api.score.Score;
-import ai.timefold.solver.core.impl.bavet.common.AbstractIfExistsNode;
 import ai.timefold.solver.core.impl.bavet.common.BavetAbstractConstraintStream;
 import ai.timefold.solver.core.impl.bavet.common.index.IndexerFactory;
 import ai.timefold.solver.core.impl.bavet.common.tuple.QuadTuple;
@@ -69,26 +68,11 @@ final class BavetIfExistsQuadConstraintStream<Solution_, A, B, C, D, E>
         IndexerFactory<E> indexerFactory = new IndexerFactory<>(joiner);
         var positionTracker =
                 buildHelper.getTupleStorePositionTracker(this, parentABCD.getTupleSource(), parentBridgeE.getTupleSource());
-        AbstractIfExistsNode<QuadTuple<A, B, C, D>, E> node;
-        if (filtering != null) {
-            var newDownstream = TupleLifecycle.conditionallyAny(downstream, shouldExist, filtering);
-            node = indexerFactory.hasJoiners()
-                    ? (filtering == null
-                            ? new IndexedIfExistsQuadNode<>(shouldExist, indexerFactory, newDownstream, positionTracker)
-                            : new IndexedIfExistsQuadNode<>(shouldExist, indexerFactory, newDownstream, filtering,
-                                    positionTracker))
-                    : (filtering == null ? new UnindexedIfExistsQuadNode<>(shouldExist, newDownstream, positionTracker)
-                            : new UnindexedIfExistsQuadNode<>(shouldExist, newDownstream, filtering, positionTracker));
-            newDownstream.setParent(node);
-        } else {
-            node = indexerFactory.hasJoiners()
-                    ? (filtering == null
-                            ? new IndexedIfExistsQuadNode<>(shouldExist, indexerFactory, downstream, positionTracker)
-                            : new IndexedIfExistsQuadNode<>(shouldExist, indexerFactory, downstream, filtering,
-                                    positionTracker))
-                    : (filtering == null ? new UnindexedIfExistsQuadNode<>(shouldExist, downstream, positionTracker)
-                            : new UnindexedIfExistsQuadNode<>(shouldExist, downstream, filtering, positionTracker));
-        }
+        var node = indexerFactory.hasJoiners()
+                ? (filtering == null ? new IndexedIfExistsQuadNode<>(shouldExist, indexerFactory, downstream, positionTracker)
+                        : new IndexedIfExistsQuadNode<>(shouldExist, indexerFactory, downstream, filtering, positionTracker))
+                : (filtering == null ? new UnindexedIfExistsQuadNode<>(shouldExist, downstream, positionTracker)
+                        : new UnindexedIfExistsQuadNode<>(shouldExist, downstream, filtering, positionTracker));
         buildHelper.addNode(node, this, this, parentBridgeE);
     }
 
